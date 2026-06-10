@@ -1,0 +1,58 @@
+export type AccountType = 'checking' | 'savings' | 'cash' | 'owed'
+export type AccountGroup = 'personal' | 'family' | 'business'
+export type IncomeCategory = 'freelance' | 'swimming' | 'investments' | 'centrelink'
+export type Priority = 'low' | 'medium' | 'high'
+
+export interface Account {
+  id: string
+  name: string
+  type: AccountType
+  group_name: AccountGroup
+  balance: number
+  updated_at: string
+}
+
+export interface IncomeStream {
+  id: string
+  name: string
+  category: IncomeCategory
+  amount: number
+  destination: AccountGroup
+  updated_at: string
+}
+
+export interface Todo {
+  id: string
+  title: string
+  project: string | null
+  due_date: string | null
+  priority: Priority
+  completed: boolean
+  created_at: string
+}
+
+export interface Note {
+  id: number
+  content: string | null
+  updated_at: string
+}
+
+export interface Habit {
+  id: string
+  name: string
+  active: boolean
+  created_at: string
+}
+
+export interface HabitCompletion {
+  habit_id: string
+  date: string
+}
+
+export interface CalendarEvent {
+  id: string
+  summary: string
+  start: { dateTime?: string; date?: string }
+  end: { dateTime?: string; date?: string }
+  colorId?: string
+}
