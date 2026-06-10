@@ -47,6 +47,17 @@ CREATE TABLE habit_completions (
   PRIMARY KEY (habit_id, date)
 );
 
+CREATE TABLE nutrition_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  meal_name TEXT NOT NULL,
+  calories INTEGER DEFAULT 0,
+  protein DECIMAL(6,1) DEFAULT 0,
+  carbs DECIMAL(6,1) DEFAULT 0,
+  fat DECIMAL(6,1) DEFAULT 0,
+  date DATE DEFAULT CURRENT_DATE,
+  logged_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable Row Level Security (open for now, tighten later when you add auth)
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE income_streams ENABLE ROW LEVEL SECURITY;
@@ -54,6 +65,7 @@ ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE habits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE habit_completions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nutrition_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for anon key (personal use - no multi-user auth needed)
 CREATE POLICY "Allow all" ON accounts FOR ALL USING (true) WITH CHECK (true);
@@ -62,3 +74,4 @@ CREATE POLICY "Allow all" ON todos FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON notes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON habits FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON habit_completions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON nutrition_logs FOR ALL USING (true) WITH CHECK (true);

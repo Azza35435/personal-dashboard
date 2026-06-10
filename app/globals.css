@@ -123,6 +123,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    transition: background-color 30s linear, color 30s linear;
   }
   html {
     @apply font-sans;

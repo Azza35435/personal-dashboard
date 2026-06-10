@@ -49,6 +49,17 @@ export interface HabitCompletion {
   date: string
 }
 
+export interface NutritionLog {
+  id: string
+  meal_name: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  date: string
+  logged_at: string
+}
+
 export interface CalendarEvent {
   id: string
   summary: string
