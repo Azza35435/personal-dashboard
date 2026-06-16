@@ -158,6 +158,7 @@ export default function TodoWidget() {
     const isDragging = drag?.todoId === todo.id
     const isOver = drag?.sectionId === sectionId && drag.overIdx === idx && drag.todoId !== todo.id
     const draggable = view === 'sections' && sectionId !== null
+    const sectionColor = sectionId ? sections.find(s => s.id === sectionId)?.color ?? null : null
     return (
       <div
         key={todo.id}
@@ -166,12 +167,16 @@ export default function TodoWidget() {
         onDragOver={(e) => { e.preventDefault(); sectionId && drag && setDrag(p => p ? { ...p, overIdx: idx } : p) }}
         onDragEnd={() => setDrag(null)}
         className={[
-          'flex items-start gap-2.5 bg-white/10 rounded-xl px-3 py-2 group transition',
+          'flex items-start gap-2.5 rounded-xl px-3 py-2 group transition',
           todo.completed ? 'opacity-50' : '',
           isDragging ? 'opacity-30 scale-95' : '',
           isOver ? 'border-t-2 border-white/60' : '',
           draggable ? 'cursor-grab active:cursor-grabbing' : '',
         ].join(' ')}
+        style={sectionColor
+          ? { backgroundColor: toRgba(sectionColor, 0.3), border: `1px solid ${toRgba(sectionColor, 0.5)}` }
+          : { backgroundColor: 'rgba(255,255,255,0.1)' }
+        }
       >
         <button
           onClick={() => toggle(todo)}
@@ -399,8 +404,8 @@ export default function TodoWidget() {
                       <div
                         className="space-y-1.5 rounded-xl p-2 min-h-[2.5rem] transition-colors"
                         style={sec.color ? {
-                          backgroundColor: toRgba(sec.color, 0.15),
-                          border: `1px solid ${toRgba(sec.color, 0.3)}`,
+                          backgroundColor: toRgba(sec.color, 0.08),
+                          border: `1px solid ${toRgba(sec.color, 0.25)}`,
                         } : {
                           backgroundColor: 'rgba(255,255,255,0.05)',
                           border: '1px solid rgba(255,255,255,0.1)',
