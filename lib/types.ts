@@ -63,6 +63,7 @@ export interface NutritionLog {
 export interface Section {
   id: string
   name: string
+  color: string | null
   position: number
   created_at: string
 }

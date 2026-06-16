@@ -18,6 +18,13 @@ interface TodoRow extends Todo {
   todo_sections: { section_id: string; position: number }[]
 }
 
+const toRgba = (hex: string, alpha: number) => {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 export default function TodoWidget() {
   const [todos, setTodos] = useState<TodoRow[]>([])
   const [sections, setSections] = useState<Section[]>([])
@@ -28,6 +35,7 @@ export default function TodoWidget() {
   const [adding, setAdding] = useState(false)
   const [addingSection, setAddingSection] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
+  const [newSectionColor, setNewSectionColor] = useState('#6366f1')
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [editingSectionName, setEditingSectionName] = useState('')
   const [newTodo, setNewTodo] = useState({
@@ -85,7 +93,8 @@ export default function TodoWidget() {
     setAddingSection(false)
     setNewSectionName('')
     if (!name) return
-    await supabase.from('sections').insert({ name, position: sections.length })
+    await supabase.from('sections').insert({ name, color: newSectionColor, position: sections.length })
+    setNewSectionColor('#6366f1')
     load()
   }
 
@@ -95,6 +104,11 @@ export default function TodoWidget() {
     if (!name) return
     await supabase.from('sections').update({ name }).eq('id', id)
     load()
+  }
+
+  const updateSectionColor = async (id: string, color: string) => {
+    await supabase.from('sections').update({ color }).eq('id', id)
+    setSections(prev => prev.map(s => s.id === id ? { ...s, color } : s))
   }
 
   const deleteSection = async (id: string) => {
@@ -171,9 +185,19 @@ export default function TodoWidget() {
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             {view === 'priority' && todo.todo_sections.map(ts => {
               const sec = sections.find(s => s.id === ts.section_id)
-              return sec ? (
-                <span key={ts.section_id} className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full leading-none">{sec.name}</span>
-              ) : null
+              if (!sec) return null
+              return (
+                <span
+                  key={ts.section_id}
+                  className="text-xs px-1.5 py-0.5 rounded-full leading-none"
+                  style={sec.color
+                    ? { backgroundColor: toRgba(sec.color, 0.35), border: `1px solid ${toRgba(sec.color, 0.6)}` }
+                    : { backgroundColor: 'rgba(255,255,255,0.2)' }
+                  }
+                >
+                  {sec.name}
+                </span>
+              )
             })}
             {todo.due_date && (
               <span className={`text-xs ${!todo.completed && isPast(todo.due_date) ? 'text-red-200 font-semibold' : 'opacity-60'}`}>
@@ -268,6 +292,7 @@ export default function TodoWidget() {
                     ${newTodo.sectionIds.includes(s.id)
                       ? 'bg-white text-rose-500 border-white font-semibold'
                       : 'border-white/40 hover:bg-white/20'}`}
+                  style={s.color && newTodo.sectionIds.includes(s.id) ? { backgroundColor: s.color, color: 'white', borderColor: s.color } : {}}
                 >
                   {s.name}
                 </button>
@@ -317,6 +342,7 @@ export default function TodoWidget() {
                 const isCollapsed = collapsed[sec.id]
                 return (
                   <div key={sec.id}>
+                    {/* Section header */}
                     <div className="flex items-center gap-2 mb-1.5 group/sec">
                       <button
                         onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}
@@ -324,6 +350,21 @@ export default function TodoWidget() {
                       >
                         {isCollapsed ? '▶' : '▼'}
                       </button>
+
+                      {/* Colour dot — click to change colour */}
+                      <label
+                        className="relative w-3 h-3 rounded-full flex-shrink-0 cursor-pointer"
+                        style={{ backgroundColor: sec.color ?? '#9ca3af' }}
+                        title="Change colour"
+                      >
+                        <input
+                          type="color"
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          value={sec.color ?? '#9ca3af'}
+                          onChange={e => updateSectionColor(sec.id, e.target.value)}
+                        />
+                      </label>
+
                       {editingSection === sec.id ? (
                         <input
                           autoFocus
@@ -352,14 +393,23 @@ export default function TodoWidget() {
                         ×
                       </button>
                     </div>
+
+                    {/* Coloured bubble wrapping tasks */}
                     {!isCollapsed && (
                       <div
-                        className="space-y-1.5 min-h-[1.5rem]"
+                        className="space-y-1.5 rounded-xl p-2 min-h-[2.5rem] transition-colors"
+                        style={sec.color ? {
+                          backgroundColor: toRgba(sec.color, 0.15),
+                          border: `1px solid ${toRgba(sec.color, 0.3)}`,
+                        } : {
+                          backgroundColor: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                        }}
                         onDragOver={e => e.preventDefault()}
                         onDrop={() => onDrop(sec.id)}
                       >
                         {items.length === 0
-                          ? <p className="text-xs opacity-40 px-3">No tasks</p>
+                          ? <p className="text-xs opacity-40 px-1">No tasks</p>
                           : items.map((t, i) => renderItem(t, sec.id, i))}
                       </div>
                     )}
@@ -395,17 +445,31 @@ export default function TodoWidget() {
               {/* Add section */}
               <div className="pt-1">
                 {addingSection ? (
-                  <input
-                    autoFocus
-                    className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
-                    placeholder="Section name — press Enter to save"
-                    value={newSectionName}
-                    onChange={e => setNewSectionName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') addSection()
-                      if (e.key === 'Escape') { setAddingSection(false); setNewSectionName('') }
-                    }}
-                  />
+                  <div className="flex items-center gap-2">
+                    <label
+                      className="relative w-6 h-6 rounded-full flex-shrink-0 cursor-pointer"
+                      style={{ backgroundColor: newSectionColor }}
+                      title="Pick colour"
+                    >
+                      <input
+                        type="color"
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        value={newSectionColor}
+                        onChange={e => setNewSectionColor(e.target.value)}
+                      />
+                    </label>
+                    <input
+                      autoFocus
+                      className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
+                      placeholder="Section name — press Enter to save"
+                      value={newSectionName}
+                      onChange={e => setNewSectionName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') addSection()
+                        if (e.key === 'Escape') { setAddingSection(false); setNewSectionName('') }
+                      }}
+                    />
+                  </div>
                 ) : (
                   <button
                     onClick={() => setAddingSection(true)}
