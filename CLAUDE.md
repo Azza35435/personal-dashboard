@@ -20,7 +20,7 @@ No test suite is configured yet.
 
 ## Architecture
 
-**Single-page dashboard** (`app/page.tsx`) — a `'use client'` page that renders 7 widgets in a bento grid. All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
+**Single-page dashboard** (`app/page.tsx`) — a `'use client'` page with a `WeekCalendar` taking the main area and `TodoWidget` in a fixed `w-80` right sidebar. All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
 
 ### Data flow
 
@@ -38,7 +38,7 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 
 ### Shared utilities
 
-- `lib/types.ts` — all TypeScript interfaces (`Account`, `Todo`, `Habit`, etc.) and union types (`AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`)
+- `lib/types.ts` — all TypeScript interfaces (`Account`, `Todo`, `Habit`, `Section`, etc.) and union types (`AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`)
 - `lib/utils.ts` — `cn()` (clsx + tailwind-merge), `formatCurrency()` (AUD, `en-AU`), `formatDate()`, `formatTime()`, `isToday()`, `isPast()`
 - `types/next-auth.d.ts` — module augmentation to add `accessToken?: string` to the `Session` type
 
@@ -48,7 +48,9 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`). Eac
 
 ### Database schema
 
-Six Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Eight Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+
+`sections` stores named task groups (id, name, position, created_at). `todo_sections` is a many-to-many junction between todos and sections (todo_id, section_id, position) — `position` drives per-section drag-and-drop order. Both cascade-delete on parent row removal.
 
 ## Environment variables
 
