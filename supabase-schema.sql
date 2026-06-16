@@ -58,6 +58,20 @@ CREATE TABLE nutrition_logs (
   logged_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE sections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE todo_sections (
+  todo_id UUID REFERENCES todos(id) ON DELETE CASCADE,
+  section_id UUID REFERENCES sections(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (todo_id, section_id)
+);
+
 -- Enable Row Level Security (open for now, tighten later when you add auth)
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE income_streams ENABLE ROW LEVEL SECURITY;
@@ -75,3 +89,7 @@ CREATE POLICY "Allow all" ON notes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON habits FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON habit_completions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON nutrition_logs FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE todo_sections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON sections FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON todo_sections FOR ALL USING (true) WITH CHECK (true);

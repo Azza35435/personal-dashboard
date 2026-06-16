@@ -60,6 +60,13 @@ export interface NutritionLog {
   logged_at: string
 }
 
+export interface Section {
+  id: string
+  name: string
+  position: number
+  created_at: string
+}
+
 export interface CalendarEvent {
   id: string
   summary: string
