@@ -32,6 +32,16 @@ interface DragState {
   height: number
 }
 
+interface EditingCard {
+  todoId: string
+  title: string
+  priority: Priority
+  dueDate: string
+  sectionIds: string[]
+  anchorRight: number  // right edge of the ··· button (viewport coords)
+  anchorBottom: number // bottom edge of the ··· button (viewport coords)
+}
+
 interface SectionDragState {
   sectionId: string
   sectionName: string
@@ -77,6 +87,7 @@ export default function TodoWidget() {
   })
   const [dragging, setDragging] = useState<DragState | null>(null)
   const [sectionDrag, setSectionDrag] = useState<SectionDragState | null>(null)
+  const [editingCard, setEditingCard] = useState<EditingCard | null>(null)
 
   const load = async () => {
     const [{ data: secs }, { data: tds }] = await Promise.all([
@@ -217,6 +228,41 @@ export default function TodoWidget() {
     await supabase.from('todos').delete().eq('id', id)
     load()
   }
+
+  const openEdit = (e: React.MouseEvent, todo: TodoRow) => {
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setEditingCard({
+      todoId: todo.id,
+      title: todo.title,
+      priority: todo.priority,
+      dueDate: todo.due_date ?? '',
+      sectionIds: todo.todo_sections.map(ts => ts.section_id),
+      anchorRight: rect.right,
+      anchorBottom: rect.bottom,
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!editingCard || !editingCard.title.trim()) return
+    const { todoId, title, priority, dueDate, sectionIds } = editingCard
+    await supabase.from('todos').update({ title: title.trim(), priority, due_date: dueDate || null }).eq('id', todoId)
+    await supabase.from('todo_sections').delete().eq('todo_id', todoId)
+    if (sectionIds.length > 0) {
+      await supabase.from('todo_sections').insert(
+        sectionIds.map((sid, pos) => ({ todo_id: todoId, section_id: sid, position: pos }))
+      )
+    }
+    setEditingCard(null)
+    load()
+  }
+
+  useEffect(() => {
+    if (!editingCard) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setEditingCard(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [!!editingCard]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateTodoTitle = async (id: string, title: string) => {
     const t = title.trim()
@@ -397,7 +443,21 @@ export default function TodoWidget() {
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_COLORS[todo.priority]}`} />
-          <button onClick={() => remove(todo.id)} onPointerDown={e => e.stopPropagation()} className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition">×</button>
+          <button
+            onClick={(e) => openEdit(e, todo)}
+            onPointerDown={e => e.stopPropagation()}
+            className="text-white/50 hover:text-white/90 text-sm leading-none transition px-0.5"
+            title="Edit task"
+          >
+            ···
+          </button>
+          <button
+            onClick={() => remove(todo.id)}
+            onPointerDown={e => e.stopPropagation()}
+            className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition"
+          >
+            ×
+          </button>
         </div>
       </div>
     )
@@ -639,6 +699,93 @@ export default function TodoWidget() {
           )}
           <span className="text-sm font-semibold truncate">{sectionDrag.sectionName}</span>
         </div>
+      )}
+
+      {/* Edit popover */}
+      {editingCard && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setEditingCard(null)} />
+          <div
+            className="fixed z-50 w-56 rounded-2xl p-3 flex flex-col gap-2.5 shadow-2xl"
+            style={{
+              right: window.innerWidth - editingCard.anchorRight,
+              top: editingCard.anchorBottom + 6,
+              backgroundColor: '#9f1239',
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Title */}
+            <input
+              autoFocus
+              className="w-full bg-white/15 rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/40 outline-none"
+              placeholder="Task title"
+              value={editingCard.title}
+              onChange={e => setEditingCard(p => p ? { ...p, title: e.target.value } : p)}
+              onKeyDown={e => e.key === 'Enter' && saveEdit()}
+            />
+
+            {/* Priority */}
+            <div className="flex gap-1">
+              {(['high', 'medium', 'low'] as Priority[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setEditingCard(prev => prev ? { ...prev, priority: p } : prev)}
+                  className={`flex-1 text-xs py-1 rounded-lg capitalize transition font-medium
+                    ${editingCard.priority === p ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {/* Due date */}
+            <input
+              type="date"
+              className="w-full bg-white/15 rounded-lg px-3 py-1.5 text-sm text-white outline-none"
+              value={editingCard.dueDate}
+              onChange={e => setEditingCard(p => p ? { ...p, dueDate: e.target.value } : p)}
+            />
+
+            {/* Sections */}
+            {sections.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {sections.map(s => {
+                  const active = editingCard.sectionIds.includes(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setEditingCard(prev => {
+                        if (!prev) return prev
+                        const ids = active
+                          ? prev.sectionIds.filter(id => id !== s.id)
+                          : [...prev.sectionIds, s.id]
+                        return { ...prev, sectionIds: ids }
+                      })}
+                      className="text-xs px-2 py-0.5 rounded-full transition border"
+                      style={active && s.color
+                        ? { backgroundColor: toRgba(s.color, 0.4), borderColor: toRgba(s.color, 0.7), fontWeight: 600 }
+                        : active
+                          ? { backgroundColor: 'rgba(255,255,255,0.25)', borderColor: 'rgba(255,255,255,0.4)', fontWeight: 600 }
+                          : { borderColor: 'rgba(255,255,255,0.2)' }}
+                    >
+                      {s.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Save */}
+            <button
+              onClick={saveEdit}
+              className="w-full bg-white text-rose-700 font-semibold text-sm py-1.5 rounded-lg hover:bg-white/90 transition"
+            >
+              Save
+            </button>
+          </div>
+        </>
       )}
 
       {/* Floating card that follows the cursor */}
