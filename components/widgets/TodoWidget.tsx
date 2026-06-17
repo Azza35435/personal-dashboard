@@ -273,6 +273,7 @@ export default function TodoWidget() {
       >
         <button
           onClick={() => toggle(todo)}
+          onPointerDown={e => e.stopPropagation()}
           className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-white/50 flex items-center justify-center transition
             ${todo.completed ? 'bg-white/60' : 'hover:bg-white/20'}`}
         >
@@ -325,7 +326,7 @@ export default function TodoWidget() {
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_COLORS[todo.priority]}`} />
-          <button onClick={() => remove(todo.id)} className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition">×</button>
+          <button onClick={() => remove(todo.id)} onPointerDown={e => e.stopPropagation()} className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition">×</button>
         </div>
       </div>
     )
