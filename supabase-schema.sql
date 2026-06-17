@@ -25,6 +25,7 @@ CREATE TABLE todos (
   due_date DATE,
   priority TEXT DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
   completed BOOLEAN DEFAULT FALSE,
+  position INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -61,6 +62,7 @@ CREATE TABLE nutrition_logs (
 CREATE TABLE sections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  color TEXT,
   position INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

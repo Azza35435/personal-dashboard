@@ -38,18 +38,20 @@ export default function TodoWidget() {
   const [newSectionColor, setNewSectionColor] = useState('#6366f1')
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [editingSectionName, setEditingSectionName] = useState('')
+  const [editingTodo, setEditingTodo] = useState<string | null>(null)
+  const [editingTodoTitle, setEditingTodoTitle] = useState('')
   const [newTodo, setNewTodo] = useState({
     title: '',
     due_date: '',
     priority: 'medium' as Priority,
     sectionIds: [] as string[],
   })
-  const [drag, setDrag] = useState<{ todoId: string; sectionId: string; overIdx: number } | null>(null)
+  const [drag, setDrag] = useState<{ todoId: string; groupKey: string; overIdx: number } | null>(null)
 
   const load = async () => {
     const [{ data: secs }, { data: tds }] = await Promise.all([
       supabase.from('sections').select('*').order('position'),
-      supabase.from('todos').select('*, todo_sections(section_id, position)').order('created_at', { ascending: false }),
+      supabase.from('todos').select('*, todo_sections(section_id, position)').order('position', { ascending: true }),
     ])
     setSections((secs ?? []) as Section[])
     setTodos((tds ?? []) as TodoRow[])
@@ -65,6 +67,14 @@ export default function TodoWidget() {
 
   const remove = async (id: string) => {
     await supabase.from('todos').delete().eq('id', id)
+    load()
+  }
+
+  const updateTodoTitle = async (id: string, title: string) => {
+    const t = title.trim()
+    setEditingTodo(null)
+    if (!t) return
+    await supabase.from('todos').update({ title: t }).eq('id', id)
     load()
   }
 
@@ -131,8 +141,8 @@ export default function TodoWidget() {
     return [...visible].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
   }
 
-  const onDrop = async (sectionId: string) => {
-    if (!drag || drag.sectionId !== sectionId || drag.overIdx < 0) { setDrag(null); return }
+  const onDropSection = async (sectionId: string) => {
+    if (!drag || drag.groupKey !== sectionId || drag.overIdx < 0) { setDrag(null); return }
     const items = getSectionTodos(sectionId)
     const fromIdx = items.findIndex(t => t.id === drag.todoId)
     if (fromIdx < 0 || fromIdx === drag.overIdx) { setDrag(null); return }
@@ -148,23 +158,47 @@ export default function TodoWidget() {
     load()
   }
 
+  const onDropPriority = async (priority: Priority) => {
+    if (!drag || drag.groupKey !== priority || drag.overIdx < 0) { setDrag(null); return }
+    const group = (showCompleted ? todos : todos.filter(t => !t.completed)).filter(t => t.priority === priority)
+    const fromIdx = group.findIndex(t => t.id === drag.todoId)
+    if (fromIdx < 0 || fromIdx === drag.overIdx) { setDrag(null); return }
+    const reordered = [...group]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(drag.overIdx, 0, moved)
+    await Promise.all(
+      reordered.map((t, i) =>
+        supabase.from('todos').update({ position: i }).eq('id', t.id)
+      )
+    )
+    setDrag(null)
+    load()
+  }
+
   const toggleSectionPick = (id: string) =>
     setNewTodo(p => ({
       ...p,
       sectionIds: p.sectionIds.includes(id) ? p.sectionIds.filter(s => s !== id) : [...p.sectionIds, id],
     }))
 
-  const renderItem = (todo: TodoRow, sectionId: string | null, idx: number) => {
+  const renderItem = (todo: TodoRow, sectionId: string | null, groupKey: string | null, idx: number) => {
     const isDragging = drag?.todoId === todo.id
-    const isOver = drag?.sectionId === sectionId && drag.overIdx === idx && drag.todoId !== todo.id
-    const draggable = view === 'sections' && sectionId !== null
+    const isOver = drag?.groupKey === groupKey && drag.overIdx === idx && drag.todoId !== todo.id
+    const draggable = groupKey !== null
     const sectionColor = sectionId ? sections.find(s => s.id === sectionId)?.color ?? null : null
+    const firstSectionColor = view === 'priority' && todo.todo_sections.length > 0
+      ? sections.find(s => s.id === todo.todo_sections[0].section_id)?.color ?? null
+      : null
+    const resolvedColor = sectionColor ?? firstSectionColor
+    const cardStyle = resolvedColor
+      ? { backgroundColor: toRgba(resolvedColor, 0.3), border: `1px solid ${toRgba(resolvedColor, 0.5)}` }
+      : { backgroundColor: 'rgba(255,255,255,0.1)' }
     return (
       <div
         key={todo.id}
         draggable={draggable}
-        onDragStart={() => sectionId && setDrag({ todoId: todo.id, sectionId, overIdx: idx })}
-        onDragOver={(e) => { e.preventDefault(); sectionId && drag && setDrag(p => p ? { ...p, overIdx: idx } : p) }}
+        onDragStart={() => groupKey && setDrag({ todoId: todo.id, groupKey, overIdx: idx })}
+        onDragOver={(e) => { e.preventDefault(); groupKey && drag && setDrag(p => p ? { ...p, overIdx: idx } : p) }}
         onDragEnd={() => setDrag(null)}
         className={[
           'flex items-start gap-2.5 rounded-xl px-3 py-2 group transition',
@@ -173,10 +207,7 @@ export default function TodoWidget() {
           isOver ? 'border-t-2 border-white/60' : '',
           draggable ? 'cursor-grab active:cursor-grabbing' : '',
         ].join(' ')}
-        style={sectionColor
-          ? { backgroundColor: toRgba(sectionColor, 0.3), border: `1px solid ${toRgba(sectionColor, 0.5)}` }
-          : { backgroundColor: 'rgba(255,255,255,0.1)' }
-        }
+        style={cardStyle}
       >
         <button
           onClick={() => toggle(todo)}
@@ -186,7 +217,26 @@ export default function TodoWidget() {
           {todo.completed && <span className="text-rose-500 text-xs font-bold">✓</span>}
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm leading-tight ${todo.completed ? 'line-through' : ''}`}>{todo.title}</p>
+          {editingTodo === todo.id ? (
+            <input
+              autoFocus
+              className="w-full bg-white/20 rounded px-1.5 py-0.5 text-sm outline-none"
+              value={editingTodoTitle}
+              onChange={e => setEditingTodoTitle(e.target.value)}
+              onBlur={() => updateTodoTitle(todo.id, editingTodoTitle)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') updateTodoTitle(todo.id, editingTodoTitle)
+                if (e.key === 'Escape') setEditingTodo(null)
+              }}
+            />
+          ) : (
+            <p
+              className={`text-sm leading-tight ${todo.completed ? 'line-through' : ''} cursor-text`}
+              onDoubleClick={() => { setEditingTodo(todo.id); setEditingTodoTitle(todo.title) }}
+            >
+              {todo.title}
+            </p>
+          )}
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             {view === 'priority' && todo.todo_sections.map(ts => {
               const sec = sections.find(s => s.id === ts.section_id)
@@ -331,8 +381,16 @@ export default function TodoWidget() {
                       <div className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[p]}`} />
                       <span className="text-xs font-semibold uppercase tracking-wider opacity-70">{p}</span>
                     </div>
-                    <div className="space-y-1.5">
-                      {group.map((t, i) => renderItem(t, null, i))}
+                    <div
+                      className="space-y-1.5 rounded-xl p-2 min-h-[2.5rem] transition-colors"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                      }}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={() => onDropPriority(p)}
+                    >
+                      {group.map((t, i) => renderItem(t, null, p, i))}
                     </div>
                   </div>
                 )
@@ -411,11 +469,11 @@ export default function TodoWidget() {
                           border: '1px solid rgba(255,255,255,0.1)',
                         }}
                         onDragOver={e => e.preventDefault()}
-                        onDrop={() => onDrop(sec.id)}
+                        onDrop={() => onDropSection(sec.id)}
                       >
                         {items.length === 0
                           ? <p className="text-xs opacity-40 px-1">No tasks</p>
-                          : items.map((t, i) => renderItem(t, sec.id, i))}
+                          : items.map((t, i) => renderItem(t, sec.id, sec.id, i))}
                       </div>
                     )}
                   </div>
@@ -440,7 +498,7 @@ export default function TodoWidget() {
                     </div>
                     {!collapsed.__none__ && (
                       <div className="space-y-1.5">
-                        {items.map((t, i) => renderItem(t, null, i))}
+                        {items.map((t, i) => renderItem(t, null, null, i))}
                       </div>
                     )}
                   </div>
