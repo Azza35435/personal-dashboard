@@ -32,6 +32,21 @@ interface DragState {
   height: number
 }
 
+interface SectionDragState {
+  sectionId: string
+  sectionName: string
+  sectionColor: string | null
+  sourceIndex: number
+  overIndex: number
+  capturedSections: Section[]
+  x: number
+  y: number
+  offsetX: number
+  offsetY: number
+  width: number
+  height: number
+}
+
 const toRgba = (hex: string, alpha: number) => {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -61,6 +76,7 @@ export default function TodoWidget() {
     sectionIds: [] as string[],
   })
   const [dragging, setDragging] = useState<DragState | null>(null)
+  const [sectionDrag, setSectionDrag] = useState<SectionDragState | null>(null)
 
   const load = async () => {
     const [{ data: secs }, { data: tds }] = await Promise.all([
@@ -117,6 +133,61 @@ export default function TodoWidget() {
       window.removeEventListener('pointerup', onUp)
     }
   }, [!!dragging]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Section drag — same pointer-event pattern, detects data-section-index on section wrappers
+  useEffect(() => {
+    if (!sectionDrag) return
+
+    let cur = sectionDrag
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'grabbing'
+
+    const onMove = (e: PointerEvent) => {
+      let newOver = cur.overIndex
+      for (const el of document.elementsFromPoint(e.clientX, e.clientY)) {
+        if (!(el instanceof HTMLElement) || el.dataset.dragFloat) continue
+        const idxStr = el.dataset.sectionIndex
+        if (idxStr !== undefined) {
+          const idx = parseInt(idxStr)
+          if (!isNaN(idx)) {
+            const rect = el.getBoundingClientRect()
+            newOver = e.clientY <= rect.top + rect.height / 2 ? idx : idx + 1
+            break
+          }
+        }
+      }
+      cur = { ...cur, x: e.clientX, y: e.clientY, overIndex: newOver }
+      setSectionDrag(cur)
+    }
+
+    const onUp = () => {
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      setSectionDrag(null)
+      commitSectionDrop(cur)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [!!sectionDrag]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitSectionDrop = async (d: SectionDragState) => {
+    const adjusted = d.overIndex > d.sourceIndex ? d.overIndex - 1 : d.overIndex
+    if (adjusted === d.sourceIndex) return
+    const reordered = [...d.capturedSections]
+    const [moved] = reordered.splice(d.sourceIndex, 1)
+    reordered.splice(adjusted, 0, moved)
+    await Promise.all(reordered.map((s, i) =>
+      supabase.from('sections').update({ position: i }).eq('id', s.id)
+    ))
+    load()
+  }
 
   const commitDrop = async (d: DragState) => {
     const adjusted = d.overIndex > d.sourceIndex ? d.overIndex - 1 : d.overIndex
@@ -358,11 +429,217 @@ export default function TodoWidget() {
     return nodes
   }
 
+  const renderSectionsView = (): React.ReactNode[] => {
+    const sd = sectionDrag
+    const sOver = sd?.overIndex ?? -1
+    const sSrc = sd?.sourceIndex ?? -1
+    const sGapAt = sd && sOver !== sSrc && sOver !== sSrc + 1 ? sOver : -1
+
+    const nodes: React.ReactNode[] = []
+
+    for (let i = 0; i <= sections.length; i++) {
+      if (sGapAt === i) {
+        nodes.push(
+          <div key="__sec-gap__" className="rounded-xl transition-all duration-200 ease-out" style={{ height: sd!.height }} />
+        )
+      }
+      if (i < sections.length) {
+        const sec = sections[i]
+        const items = getSectionTodos(sec.id)
+        const isCollapsed = collapsed[sec.id]
+        const isFaded = sd?.sectionId === sec.id
+        nodes.push(
+          <div
+            key={sec.id}
+            data-section-index={String(i)}
+            className={`transition-opacity duration-150 ${isFaded ? 'opacity-30 pointer-events-none' : ''}`}
+          >
+            <div
+              className="flex items-center gap-2 mb-1.5 group/sec select-none cursor-grab"
+              onPointerDown={(e) => {
+                if (e.button !== 0 || editingSection === sec.id) return
+                e.preventDefault()
+                const wrapper = e.currentTarget.closest('[data-section-index]') as HTMLElement
+                const rect = (wrapper ?? e.currentTarget).getBoundingClientRect()
+                setSectionDrag({
+                  sectionId: sec.id,
+                  sectionName: sec.name,
+                  sectionColor: sec.color ?? null,
+                  sourceIndex: i,
+                  overIndex: i,
+                  capturedSections: sections,
+                  x: e.clientX,
+                  y: e.clientY,
+                  offsetX: e.clientX - rect.left,
+                  offsetY: e.clientY - rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                })
+              }}
+            >
+              <button
+                onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}
+                onPointerDown={e => e.stopPropagation()}
+                className="text-xs opacity-50 hover:opacity-100 w-3 text-left leading-none"
+              >
+                {isCollapsed ? '▶' : '▼'}
+              </button>
+              <label
+                className="relative w-3 h-3 rounded-full flex-shrink-0 cursor-pointer"
+                style={{ backgroundColor: sec.color ?? '#9ca3af' }}
+                title="Change colour"
+                onPointerDown={e => e.stopPropagation()}
+              >
+                <input
+                  type="color"
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  value={sec.color ?? '#9ca3af'}
+                  onChange={e => updateSectionColor(sec.id, e.target.value)}
+                />
+              </label>
+              {editingSection === sec.id ? (
+                <input
+                  autoFocus
+                  className="flex-1 bg-white/20 rounded px-2 py-0.5 text-sm font-semibold outline-none"
+                  value={editingSectionName}
+                  onChange={e => setEditingSectionName(e.target.value)}
+                  onBlur={() => renameSection(sec.id)}
+                  onPointerDown={e => e.stopPropagation()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') renameSection(sec.id)
+                    if (e.key === 'Escape') setEditingSection(null)
+                  }}
+                />
+              ) : (
+                <span
+                  className="text-sm font-semibold hover:opacity-80 transition"
+                  onDoubleClick={() => { setEditingSection(sec.id); setEditingSectionName(sec.name) }}
+                >
+                  {sec.name}
+                </span>
+              )}
+              <span className="text-xs opacity-40">{items.length}</span>
+              <button
+                onClick={() => deleteSection(sec.id)}
+                onPointerDown={e => e.stopPropagation()}
+                className="ml-auto opacity-0 group-hover/sec:opacity-40 hover:!opacity-100 text-sm transition"
+              >
+                ×
+              </button>
+            </div>
+            {!isCollapsed && (
+              <div
+                className="flex flex-col gap-1.5 rounded-xl p-2 min-h-[2.5rem]"
+                style={sec.color ? {
+                  backgroundColor: toRgba(sec.color, 0.08),
+                  border: `1px solid ${toRgba(sec.color, 0.25)}`,
+                } : {
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                {items.length === 0 && !dragging
+                  ? <p className="text-xs opacity-40 px-1">No tasks</p>
+                  : renderGroup(items, sec.id, sec.id)}
+              </div>
+            )}
+          </div>
+        )
+      }
+    }
+
+    // No Section group
+    const noSectionItems = getSectionTodos(null)
+    if (noSectionItems.length > 0) {
+      nodes.push(
+        <div key="__no-section__">
+          <div className="flex items-center gap-2 mb-1.5">
+            <button
+              onClick={() => setCollapsed(p => ({ ...p, __none__: !p.__none__ }))}
+              className="text-xs opacity-40 hover:opacity-80 w-3 text-left leading-none"
+            >
+              {collapsed.__none__ ? '▶' : '▼'}
+            </button>
+            <span className="text-xs font-semibold uppercase tracking-wider opacity-40">No Section</span>
+            <span className="text-xs opacity-30">{noSectionItems.length}</span>
+          </div>
+          {!collapsed.__none__ && (
+            <div className="flex flex-col gap-1.5">
+              {renderGroup(noSectionItems, null, null)}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Add section button
+    nodes.push(
+      <div key="__add-section__" className="pt-1">
+        {addingSection ? (
+          <div className="flex items-center gap-2">
+            <label
+              className="relative w-6 h-6 rounded-full flex-shrink-0 cursor-pointer"
+              style={{ backgroundColor: newSectionColor }}
+              title="Pick colour"
+            >
+              <input
+                type="color"
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                value={newSectionColor}
+                onChange={e => setNewSectionColor(e.target.value)}
+              />
+            </label>
+            <input
+              autoFocus
+              className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
+              placeholder="Section name — press Enter to save"
+              value={newSectionName}
+              onChange={e => setNewSectionName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') addSection()
+                if (e.key === 'Escape') { setAddingSection(false); setNewSectionName('') }
+              }}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setAddingSection(true)}
+            className="text-xs opacity-50 hover:opacity-100 transition"
+          >
+            + Add section
+          </button>
+        )}
+      </div>
+    )
+
+    return nodes
+  }
+
   const visibleTodos = showCompleted ? todos : todos.filter(t => !t.completed)
   const draggingTodo = dragging ? todos.find(t => t.id === dragging.todoId) ?? null : null
 
   return (
     <div className="rounded-2xl p-5 flex flex-col gap-3 h-full bg-rose-500 text-white">
+
+      {/* Floating section header during section drag */}
+      {sectionDrag && (
+        <div
+          data-drag-float="true"
+          className="fixed z-50 pointer-events-none rounded-xl px-3 py-2 flex items-center gap-2 shadow-2xl ring-1 ring-white/20 select-none"
+          style={{
+            left: sectionDrag.x - sectionDrag.offsetX,
+            top: sectionDrag.y - sectionDrag.offsetY,
+            width: sectionDrag.width,
+            backgroundColor: sectionDrag.sectionColor ? toRgba(sectionDrag.sectionColor, 0.4) : 'rgba(255,255,255,0.15)',
+            border: sectionDrag.sectionColor ? `1px solid ${toRgba(sectionDrag.sectionColor, 0.6)}` : '1px solid rgba(255,255,255,0.2)',
+          }}
+        >
+          {sectionDrag.sectionColor && (
+            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: sectionDrag.sectionColor }} />
+          )}
+          <span className="text-sm font-semibold truncate">{sectionDrag.sectionName}</span>
+        </div>
+      )}
 
       {/* Floating card that follows the cursor */}
       {dragging && draggingTodo && (
@@ -502,144 +779,7 @@ export default function TodoWidget() {
           )}
 
           {/* ── Sections view ── */}
-          {view === 'sections' && (
-            <>
-              {sections.map(sec => {
-                const items = getSectionTodos(sec.id)
-                const isCollapsed = collapsed[sec.id]
-                return (
-                  <div key={sec.id}>
-                    <div className="flex items-center gap-2 mb-1.5 group/sec">
-                      <button
-                        onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}
-                        className="text-xs opacity-50 hover:opacity-100 w-3 text-left leading-none"
-                      >
-                        {isCollapsed ? '▶' : '▼'}
-                      </button>
-                      <label
-                        className="relative w-3 h-3 rounded-full flex-shrink-0 cursor-pointer"
-                        style={{ backgroundColor: sec.color ?? '#9ca3af' }}
-                        title="Change colour"
-                      >
-                        <input
-                          type="color"
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          value={sec.color ?? '#9ca3af'}
-                          onChange={e => updateSectionColor(sec.id, e.target.value)}
-                        />
-                      </label>
-                      {editingSection === sec.id ? (
-                        <input
-                          autoFocus
-                          className="flex-1 bg-white/20 rounded px-2 py-0.5 text-sm font-semibold outline-none"
-                          value={editingSectionName}
-                          onChange={e => setEditingSectionName(e.target.value)}
-                          onBlur={() => renameSection(sec.id)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') renameSection(sec.id)
-                            if (e.key === 'Escape') setEditingSection(null)
-                          }}
-                        />
-                      ) : (
-                        <span
-                          className="text-sm font-semibold cursor-pointer hover:opacity-80 transition"
-                          onDoubleClick={() => { setEditingSection(sec.id); setEditingSectionName(sec.name) }}
-                        >
-                          {sec.name}
-                        </span>
-                      )}
-                      <span className="text-xs opacity-40">{items.length}</span>
-                      <button
-                        onClick={() => deleteSection(sec.id)}
-                        className="ml-auto opacity-0 group-hover/sec:opacity-40 hover:!opacity-100 text-sm transition"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    {!isCollapsed && (
-                      <div
-                        className="flex flex-col gap-1.5 rounded-xl p-2 min-h-[2.5rem]"
-                        style={sec.color ? {
-                          backgroundColor: toRgba(sec.color, 0.08),
-                          border: `1px solid ${toRgba(sec.color, 0.25)}`,
-                        } : {
-                          backgroundColor: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                        }}
-                      >
-                        {items.length === 0 && !dragging
-                          ? <p className="text-xs opacity-40 px-1">No tasks</p>
-                          : renderGroup(items, sec.id, sec.id)}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* No Section group */}
-              {(() => {
-                const items = getSectionTodos(null)
-                if (items.length === 0) return null
-                return (
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <button
-                        onClick={() => setCollapsed(p => ({ ...p, __none__: !p.__none__ }))}
-                        className="text-xs opacity-40 hover:opacity-80 w-3 text-left leading-none"
-                      >
-                        {collapsed.__none__ ? '▶' : '▼'}
-                      </button>
-                      <span className="text-xs font-semibold uppercase tracking-wider opacity-40">No Section</span>
-                      <span className="text-xs opacity-30">{items.length}</span>
-                    </div>
-                    {!collapsed.__none__ && (
-                      <div className="flex flex-col gap-1.5">
-                        {renderGroup(items, null, null)}
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-
-              {/* Add section */}
-              <div className="pt-1">
-                {addingSection ? (
-                  <div className="flex items-center gap-2">
-                    <label
-                      className="relative w-6 h-6 rounded-full flex-shrink-0 cursor-pointer"
-                      style={{ backgroundColor: newSectionColor }}
-                      title="Pick colour"
-                    >
-                      <input
-                        type="color"
-                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                        value={newSectionColor}
-                        onChange={e => setNewSectionColor(e.target.value)}
-                      />
-                    </label>
-                    <input
-                      autoFocus
-                      className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
-                      placeholder="Section name — press Enter to save"
-                      value={newSectionName}
-                      onChange={e => setNewSectionName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') addSection()
-                        if (e.key === 'Escape') { setAddingSection(false); setNewSectionName('') }
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setAddingSection(true)}
-                    className="text-xs opacity-50 hover:opacity-100 transition"
-                  >
-                    + Add section
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          {view === 'sections' && renderSectionsView()}
 
         </div>
       )}
