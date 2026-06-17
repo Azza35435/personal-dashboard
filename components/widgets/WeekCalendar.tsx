@@ -62,7 +62,7 @@ export default function WeekCalendar() {
     return getWeekDays(base)
   })()
 
-  useEffect(() => {
+  const fetchEvents = () => {
     if (!session) return
     setLoading(true)
     const start = weekDays[0].toISOString()
@@ -71,6 +71,18 @@ export default function WeekCalendar() {
       .then(r => r.json())
       .then(data => { setEvents(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchEvents()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, weekOffset])
+
+  // Auto-refresh every 5 minutes when viewing the current week
+  useEffect(() => {
+    if (!session || weekOffset !== 0) return
+    const interval = setInterval(fetchEvents, 5 * 60 * 1000)
+    return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, weekOffset])
 

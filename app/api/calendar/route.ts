@@ -13,23 +13,39 @@ export async function GET(request: Request) {
   const start = searchParams.get('start') ?? new Date().toISOString()
   const end = searchParams.get('end')
 
-  let url =
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events` +
-    `?timeMin=${encodeURIComponent(start)}` +
-    `&maxResults=100` +
-    `&singleEvents=true` +
-    `&orderBy=startTime`
+  const authHeader = { Authorization: `Bearer ${session.accessToken}` }
 
-  if (end) url += `&timeMax=${encodeURIComponent(end)}`
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${session.accessToken}` },
-  })
-
-  if (!res.ok) {
-    return NextResponse.json({ error: 'Calendar API error' }, { status: res.status })
+  // Fetch the list of all calendars this account has access to
+  const listRes = await fetch(
+    'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+    { headers: authHeader }
+  )
+  if (!listRes.ok) {
+    return NextResponse.json({ error: 'Failed to fetch calendar list' }, { status: listRes.status })
   }
+  const listData = await listRes.json()
+  const calendarIds: string[] = (listData.items ?? []).map((c: { id: string }) => c.id)
 
-  const data = await res.json()
-  return NextResponse.json(data.items ?? [])
+  // Fetch events from every calendar in parallel
+  const results = await Promise.all(
+    calendarIds.map(async (calId) => {
+      let url =
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events` +
+        `?timeMin=${encodeURIComponent(start)}` +
+        `&maxResults=100` +
+        `&singleEvents=true` +
+        `&orderBy=startTime`
+      if (end) url += `&timeMax=${encodeURIComponent(end)}`
+
+      const res = await fetch(url, { headers: authHeader })
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data.items ?? []).map((e: Record<string, unknown>) => ({
+        ...e,
+        calendarId: calId,
+      }))
+    })
+  )
+
+  return NextResponse.json(results.flat())
 }
