@@ -4,6 +4,9 @@ import type { NextAuthOptions } from 'next-auth'
 import type { JWT } from 'next-auth/jwt'
 
 export const authOptions: NextAuthOptions = {
+  pages: {
+    error: '/auth/error',
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
