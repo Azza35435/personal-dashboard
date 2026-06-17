@@ -18,6 +18,20 @@ interface TodoRow extends Todo {
   todo_sections: { section_id: string; position: number }[]
 }
 
+interface DragState {
+  todoId: string
+  groupKey: string
+  sourceIndex: number
+  overIndex: number
+  items: TodoRow[]
+  x: number
+  y: number
+  offsetX: number
+  offsetY: number
+  width: number
+  height: number
+}
+
 const toRgba = (hex: string, alpha: number) => {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -46,7 +60,7 @@ export default function TodoWidget() {
     priority: 'medium' as Priority,
     sectionIds: [] as string[],
   })
-  const [drag, setDrag] = useState<{ todoId: string; groupKey: string; overIdx: number } | null>(null)
+  const [dragging, setDragging] = useState<DragState | null>(null)
 
   const load = async () => {
     const [{ data: secs }, { data: tds }] = await Promise.all([
@@ -59,6 +73,69 @@ export default function TodoWidget() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Pointer-event drag system — subscribes once per drag, uses a mutable local ref
+  useEffect(() => {
+    if (!dragging) return
+
+    let cur = dragging
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'grabbing'
+
+    const onMove = (e: PointerEvent) => {
+      let newOver = cur.overIndex
+      for (const el of document.elementsFromPoint(e.clientX, e.clientY)) {
+        if (!(el instanceof HTMLElement) || el.dataset.dragFloat) continue
+        const gk = el.dataset.groupKey
+        const idxStr = el.dataset.index
+        if (gk === cur.groupKey && idxStr !== undefined) {
+          const idx = parseInt(idxStr)
+          if (!isNaN(idx)) {
+            const rect = el.getBoundingClientRect()
+            newOver = e.clientY <= rect.top + rect.height / 2 ? idx : idx + 1
+            break
+          }
+        }
+      }
+      cur = { ...cur, x: e.clientX, y: e.clientY, overIndex: newOver }
+      setDragging(cur)
+    }
+
+    const onUp = () => {
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      setDragging(null)
+      commitDrop(cur)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [!!dragging]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitDrop = async (d: DragState) => {
+    const adjusted = d.overIndex > d.sourceIndex ? d.overIndex - 1 : d.overIndex
+    if (adjusted === d.sourceIndex) return
+    const reordered = [...d.items]
+    const [moved] = reordered.splice(d.sourceIndex, 1)
+    reordered.splice(adjusted, 0, moved)
+    const isPriorityGroup = (['high', 'medium', 'low'] as string[]).includes(d.groupKey)
+    if (isPriorityGroup) {
+      await Promise.all(reordered.map((t, i) =>
+        supabase.from('todos').update({ position: i }).eq('id', t.id)
+      ))
+    } else {
+      await Promise.all(reordered.map((t, i) =>
+        supabase.from('todo_sections').update({ position: i }).eq('todo_id', t.id).eq('section_id', d.groupKey)
+      ))
+    }
+    load()
+  }
 
   const toggle = async (t: TodoRow) => {
     await supabase.from('todos').update({ completed: !t.completed }).eq('id', t.id)
@@ -141,38 +218,15 @@ export default function TodoWidget() {
     return [...visible].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
   }
 
-  const onDropSection = async (sectionId: string) => {
-    if (!drag || drag.groupKey !== sectionId || drag.overIdx < 0) { setDrag(null); return }
-    const items = getSectionTodos(sectionId)
-    const fromIdx = items.findIndex(t => t.id === drag.todoId)
-    if (fromIdx < 0 || fromIdx === drag.overIdx) { setDrag(null); return }
-    const reordered = [...items]
-    const [moved] = reordered.splice(fromIdx, 1)
-    reordered.splice(drag.overIdx, 0, moved)
-    await Promise.all(
-      reordered.map((t, i) =>
-        supabase.from('todo_sections').update({ position: i }).eq('todo_id', t.id).eq('section_id', sectionId)
-      )
-    )
-    setDrag(null)
-    load()
-  }
-
-  const onDropPriority = async (priority: Priority) => {
-    if (!drag || drag.groupKey !== priority || drag.overIdx < 0) { setDrag(null); return }
-    const group = (showCompleted ? todos : todos.filter(t => !t.completed)).filter(t => t.priority === priority)
-    const fromIdx = group.findIndex(t => t.id === drag.todoId)
-    if (fromIdx < 0 || fromIdx === drag.overIdx) { setDrag(null); return }
-    const reordered = [...group]
-    const [moved] = reordered.splice(fromIdx, 1)
-    reordered.splice(drag.overIdx, 0, moved)
-    await Promise.all(
-      reordered.map((t, i) =>
-        supabase.from('todos').update({ position: i }).eq('id', t.id)
-      )
-    )
-    setDrag(null)
-    load()
+  const resolveCardStyle = (todo: TodoRow, sectionId: string | null) => {
+    const sectionColor = sectionId ? sections.find(s => s.id === sectionId)?.color ?? null : null
+    const firstSectionColor = view === 'priority' && todo.todo_sections.length > 0
+      ? sections.find(s => s.id === todo.todo_sections[0].section_id)?.color ?? null
+      : null
+    const c = sectionColor ?? firstSectionColor
+    return c
+      ? { backgroundColor: toRgba(c, 0.3), border: `1px solid ${toRgba(c, 0.5)}` }
+      : { backgroundColor: 'rgba(255,255,255,0.1)' }
   }
 
   const toggleSectionPick = (id: string) =>
@@ -181,33 +235,41 @@ export default function TodoWidget() {
       sectionIds: p.sectionIds.includes(id) ? p.sectionIds.filter(s => s !== id) : [...p.sectionIds, id],
     }))
 
-  const renderItem = (todo: TodoRow, sectionId: string | null, groupKey: string | null, idx: number) => {
-    const isDragging = drag?.todoId === todo.id
-    const isOver = drag?.groupKey === groupKey && drag.overIdx === idx && drag.todoId !== todo.id
-    const draggable = groupKey !== null
-    const sectionColor = sectionId ? sections.find(s => s.id === sectionId)?.color ?? null : null
-    const firstSectionColor = view === 'priority' && todo.todo_sections.length > 0
-      ? sections.find(s => s.id === todo.todo_sections[0].section_id)?.color ?? null
-      : null
-    const resolvedColor = sectionColor ?? firstSectionColor
-    const cardStyle = resolvedColor
-      ? { backgroundColor: toRgba(resolvedColor, 0.3), border: `1px solid ${toRgba(resolvedColor, 0.5)}` }
-      : { backgroundColor: 'rgba(255,255,255,0.1)' }
+  const renderItem = (todo: TodoRow, sectionId: string | null, groupKey: string | null, idx: number, items: TodoRow[]) => {
+    const isDragSource = dragging?.todoId === todo.id
+    const canDrag = groupKey !== null && !editingTodo
+
     return (
       <div
         key={todo.id}
-        draggable={draggable}
-        onDragStart={() => groupKey && setDrag({ todoId: todo.id, groupKey, overIdx: idx })}
-        onDragOver={(e) => { e.preventDefault(); groupKey && drag && setDrag(p => p ? { ...p, overIdx: idx } : p) }}
-        onDragEnd={() => setDrag(null)}
+        data-todo-id={todo.id}
+        data-group-key={groupKey ?? ''}
+        data-index={String(idx)}
+        onPointerDown={canDrag ? (e) => {
+          if (e.button !== 0) return
+          e.preventDefault()
+          const rect = e.currentTarget.getBoundingClientRect()
+          setDragging({
+            todoId: todo.id,
+            groupKey: groupKey!,
+            sourceIndex: idx,
+            overIndex: idx,
+            items,
+            x: e.clientX,
+            y: e.clientY,
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
+            width: rect.width,
+            height: rect.height,
+          })
+        } : undefined}
         className={[
-          'flex items-start gap-2.5 rounded-xl px-3 py-2 group transition',
-          todo.completed ? 'opacity-50' : '',
-          isDragging ? 'opacity-30 scale-95' : '',
-          isOver ? 'border-t-2 border-white/60' : '',
-          draggable ? 'cursor-grab active:cursor-grabbing' : '',
+          'flex items-start gap-2.5 rounded-xl px-3 py-2 group select-none',
+          'transition-opacity duration-150',
+          isDragSource ? 'opacity-30 pointer-events-none' : '',
+          canDrag && !dragging ? 'cursor-grab' : '',
         ].join(' ')}
-        style={cardStyle}
+        style={resolveCardStyle(todo, sectionId)}
       >
         <button
           onClick={() => toggle(todo)}
@@ -269,10 +331,56 @@ export default function TodoWidget() {
     )
   }
 
+  // Renders items for a group, injecting a gap spacer at the hover position
+  const renderGroup = (items: TodoRow[], sectionId: string | null, groupKey: string | null) => {
+    const active = dragging?.groupKey === groupKey
+    const over = active ? dragging!.overIndex : -1
+    const src = active ? dragging!.sourceIndex : -1
+    // Don't show gap when item would stay in the same spot
+    const gapAt = active && over !== src && over !== src + 1 ? over : -1
+
+    const nodes: React.ReactNode[] = []
+    for (let i = 0; i <= items.length; i++) {
+      if (gapAt === i) {
+        nodes.push(
+          <div
+            key="__gap__"
+            className="rounded-xl transition-all duration-200 ease-out"
+            style={{ height: dragging!.height }}
+          />
+        )
+      }
+      if (i < items.length) {
+        nodes.push(renderItem(items[i], sectionId, groupKey, i, items))
+      }
+    }
+    return nodes
+  }
+
   const visibleTodos = showCompleted ? todos : todos.filter(t => !t.completed)
+  const draggingTodo = dragging ? todos.find(t => t.id === dragging.todoId) ?? null : null
 
   return (
     <div className="rounded-2xl p-5 flex flex-col gap-3 h-full bg-rose-500 text-white">
+
+      {/* Floating card that follows the cursor */}
+      {dragging && draggingTodo && (
+        <div
+          data-drag-float="true"
+          className="fixed z-50 pointer-events-none rounded-xl px-3 py-2 flex items-start gap-2.5 shadow-2xl ring-1 ring-white/20"
+          style={{
+            left: dragging.x - dragging.offsetX,
+            top: dragging.y - dragging.offsetY,
+            width: dragging.width,
+            ...resolveCardStyle(draggingTodo, view === 'sections' ? dragging.groupKey : null),
+          }}
+        >
+          <div className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-white/50" />
+          <p className="flex-1 text-sm leading-tight truncate min-w-0">{draggingTodo.title}</p>
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${PRIORITY_COLORS[draggingTodo.priority]}`} />
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -366,7 +474,7 @@ export default function TodoWidget() {
           {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-8 bg-white/20 rounded-lg" />)}
         </div>
       ) : (
-        <div className="overflow-y-auto flex-1 space-y-4 pr-0.5">
+        <div className="overflow-y-auto flex-1 pr-0.5 flex flex-col gap-4">
 
           {/* ── Priority view ── */}
           {view === 'priority' && (
@@ -382,15 +490,10 @@ export default function TodoWidget() {
                       <span className="text-xs font-semibold uppercase tracking-wider opacity-70">{p}</span>
                     </div>
                     <div
-                      className="space-y-1.5 rounded-xl p-2 min-h-[2.5rem] transition-colors"
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                      }}
-                      onDragOver={e => e.preventDefault()}
-                      onDrop={() => onDropPriority(p)}
+                      className="flex flex-col gap-1.5 rounded-xl p-2 min-h-[2.5rem]"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
                     >
-                      {group.map((t, i) => renderItem(t, null, p, i))}
+                      {renderGroup(group, null, p)}
                     </div>
                   </div>
                 )
@@ -405,7 +508,6 @@ export default function TodoWidget() {
                 const isCollapsed = collapsed[sec.id]
                 return (
                   <div key={sec.id}>
-                    {/* Section header */}
                     <div className="flex items-center gap-2 mb-1.5 group/sec">
                       <button
                         onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}
@@ -413,8 +515,6 @@ export default function TodoWidget() {
                       >
                         {isCollapsed ? '▶' : '▼'}
                       </button>
-
-                      {/* Colour dot — click to change colour */}
                       <label
                         className="relative w-3 h-3 rounded-full flex-shrink-0 cursor-pointer"
                         style={{ backgroundColor: sec.color ?? '#9ca3af' }}
@@ -427,7 +527,6 @@ export default function TodoWidget() {
                           onChange={e => updateSectionColor(sec.id, e.target.value)}
                         />
                       </label>
-
                       {editingSection === sec.id ? (
                         <input
                           autoFocus
@@ -456,11 +555,9 @@ export default function TodoWidget() {
                         ×
                       </button>
                     </div>
-
-                    {/* Coloured bubble wrapping tasks */}
                     {!isCollapsed && (
                       <div
-                        className="space-y-1.5 rounded-xl p-2 min-h-[2.5rem] transition-colors"
+                        className="flex flex-col gap-1.5 rounded-xl p-2 min-h-[2.5rem]"
                         style={sec.color ? {
                           backgroundColor: toRgba(sec.color, 0.08),
                           border: `1px solid ${toRgba(sec.color, 0.25)}`,
@@ -468,12 +565,10 @@ export default function TodoWidget() {
                           backgroundColor: 'rgba(255,255,255,0.05)',
                           border: '1px solid rgba(255,255,255,0.1)',
                         }}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={() => onDropSection(sec.id)}
                       >
-                        {items.length === 0
+                        {items.length === 0 && !dragging
                           ? <p className="text-xs opacity-40 px-1">No tasks</p>
-                          : items.map((t, i) => renderItem(t, sec.id, sec.id, i))}
+                          : renderGroup(items, sec.id, sec.id)}
                       </div>
                     )}
                   </div>
@@ -497,8 +592,8 @@ export default function TodoWidget() {
                       <span className="text-xs opacity-30">{items.length}</span>
                     </div>
                     {!collapsed.__none__ && (
-                      <div className="space-y-1.5">
-                        {items.map((t, i) => renderItem(t, null, null, i))}
+                      <div className="flex flex-col gap-1.5">
+                        {renderGroup(items, null, null)}
                       </div>
                     )}
                   </div>
