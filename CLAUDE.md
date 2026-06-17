@@ -52,6 +52,20 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - `fetchEvents` is an extracted named function so it can be called by both the `useEffect` on session/weekOffset change and the auto-refresh interval.
 - Shows a "Disconnect" button when authenticated to allow signing out and re-authenticating (needed if scope changes).
 
+### Google Calendar auth setup checklist
+
+Common failure modes and their fixes (all must be true for sign-in to work):
+
+1. **`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set in Vercel** — missing env vars cause immediate Google rejection with no account chooser. Verify at `/api/debug-auth`.
+2. **Authorized redirect URI in Google Cloud Console** — must include exactly `https://<your-domain>/api/auth/callback/google`. Mismatch shows `Error 400: redirect_uri_mismatch`.
+3. **`calendar.readonly` scope added to OAuth consent screen** — must be explicitly added under "Scopes" in the consent screen editor, not just in code.
+4. **Google Calendar API enabled** — APIs & Services → Enabled APIs → Google Calendar API.
+5. **Test user email added and saved** — in OAuth consent screen → Test users, type email then press Enter before clicking Save.
+6. **`NEXTAUTH_URL` set to stable production URL** — not a preview deployment URL.
+
+Debug endpoint: `GET /api/debug-auth` returns which env vars are set and the exact `redirect_uri` being sent to Google.
+Custom error page: `app/auth/error/page.tsx` shows the actual NextAuth error code (configured via `pages: { error: '/auth/error' }` in `authOptions`).
+
 ### Shared utilities
 
 - `lib/types.ts` — all TypeScript interfaces (`Account`, `Todo`, `Habit`, `Section`, etc.) and union types (`AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`)
