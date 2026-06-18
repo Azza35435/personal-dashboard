@@ -50,6 +50,7 @@ export default function WeekCalendar() {
   const { data: session, status } = useSession()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
+  const [calError, setCalError] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const timeRef = useRef<HTMLDivElement>(null)
@@ -65,12 +66,21 @@ export default function WeekCalendar() {
   const fetchEvents = () => {
     if (!session) return
     setLoading(true)
+    setCalError(null)
     const start = weekDays[0].toISOString()
     const end = new Date(weekDays[6].getTime() + 86400000).toISOString()
     fetch(`/api/calendar?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)
       .then(r => r.json())
-      .then(data => { setEvents(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setEvents(data)
+        } else {
+          setCalError(data?.error ?? JSON.stringify(data))
+          setEvents([])
+        }
+        setLoading(false)
+      })
+      .catch(err => { setCalError(String(err)); setLoading(false) })
   }
 
   useEffect(() => {
@@ -169,6 +179,13 @@ export default function WeekCalendar() {
           )
         })}
       </div>
+
+      {/* Error banner */}
+      {calError && (
+        <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-500">
+          Calendar error: {calError}
+        </div>
+      )}
 
       {/* Scrollable grid */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
