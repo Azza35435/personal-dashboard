@@ -74,6 +74,26 @@ CREATE TABLE todo_sections (
   PRIMARY KEY (todo_id, section_id)
 );
 
+CREATE TABLE gym_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  workout_type TEXT NOT NULL,
+  duration_minutes INTEGER,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE gym_exercises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES gym_sessions(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  sets INTEGER,
+  reps INTEGER,
+  weight_kg DECIMAL(6,2),
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable Row Level Security (open for now, tighten later when you add auth)
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE income_streams ENABLE ROW LEVEL SECURITY;
@@ -95,3 +115,7 @@ ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE todo_sections ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON sections FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON todo_sections FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE gym_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gym_exercises ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_sessions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON gym_exercises FOR ALL USING (true) WITH CHECK (true);

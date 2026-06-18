@@ -45,6 +45,22 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **`renderGroup()`**: builds node array with gap spacer injected at `gapAt` index. Parent container uses `flex flex-col gap-1.5` (not `space-y`) so gap sizing works correctly during drag.
 - **Section drag**: uses `data-section-index` on section wrapper divs so `elementsFromPoint` finds the target even when the cursor is over child todo items. Section position is persisted to Supabase `sections.position` on drop.
 
+#### GymWidget (`components/widgets/GymWidget.tsx`)
+
+- **Two views**: "Week" (current calendar week, Mon–Sun, with prev/next arrows) and "All" (last 50 sessions, newest first). Toggle via button in header.
+- **Session structure**: header (workout type + date + optional duration), collapsible exercise list below.
+- **Exercises**: name, sets, reps, weight (kg). Added inline via "+ Add exercise" when a session is expanded.
+- **Color picker**: ⚙ gear icon in header opens a swatch panel; selected color stored in `localStorage` under key `gym_widget_color`. Default is `bg-blue-600`.
+- **`load` as `useCallback`**: depends on `viewAll` and `weekOffset`; the `useEffect` depends on `load`, so changing either view state automatically triggers a re-fetch. Mutations call `load()` directly after await.
+- **Week navigation**: forward arrow disabled at `weekOffset >= 0` to prevent navigating to future weeks.
+
+#### NutritionWidget (`components/widgets/NutritionWidget.tsx`)
+
+- **Date navigation**: `dateOffset` state (0 = today, -1 = yesterday, …) with ‹/› arrows. Forward arrow disabled at `dateOffset >= 0`.
+- **Daily targets**: calories + protein + carbs + fat targets stored in `localStorage` under key `nutrition_targets`. Editable via "Targets" button which opens an inline form.
+- **Progress bars**: each macro tile shows a thin progress bar (`h-1`) and `/ target` label. Bar turns `bg-red-300` when the total exceeds the target.
+- **`load` as `useCallback`**: depends on `dateOffset`; `useEffect` runs on `[load]`.
+
 #### WeekCalendar (`components/widgets/WeekCalendar.tsx`)
 
 - Shows events from **all Google Calendars** (not just primary) by first fetching `calendarList` then parallel-fetching events per calendar in `/api/calendar`.
@@ -78,7 +94,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`). Eac
 
 ### Database schema
 
-Eight Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Ten Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 - `todos` has a `position INTEGER NOT NULL DEFAULT 0` column for drag-and-drop ordering within priority groups and unsectioned lists.
 - `sections` has `color TEXT` (nullable hex string, e.g. `#3b82f6`) and `position INTEGER NOT NULL DEFAULT 0` for drag-to-reorder.
@@ -88,6 +104,29 @@ Eight Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single ro
 ```sql
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE sections ADD COLUMN IF NOT EXISTS color TEXT;
+-- Gym tables (added for Health page):
+CREATE TABLE IF NOT EXISTS gym_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  workout_type TEXT NOT NULL,
+  duration_minutes INTEGER,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS gym_exercises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES gym_sessions(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  sets INTEGER,
+  reps INTEGER,
+  weight_kg DECIMAL(6,2),
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE gym_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gym_exercises ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_sessions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON gym_exercises FOR ALL USING (true) WITH CHECK (true);
 ```
 
 ## Environment variables

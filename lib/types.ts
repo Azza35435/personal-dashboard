@@ -75,3 +75,23 @@ export interface CalendarEvent {
   end: { dateTime?: string; date?: string }
   colorId?: string
 }
+
+export interface GymSession {
+  id: string
+  date: string
+  workout_type: string
+  duration_minutes: number | null
+  notes: string | null
+  created_at: string
+}
+
+export interface GymExercise {
+  id: string
+  session_id: string
+  name: string
+  sets: number | null
+  reps: number | null
+  weight_kg: number | null
+  position: number
+  created_at: string
+}
