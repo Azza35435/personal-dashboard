@@ -21,7 +21,11 @@ export async function GET(request: Request) {
     { headers: authHeader }
   )
   if (!listRes.ok) {
-    return NextResponse.json({ error: 'Failed to fetch calendar list' }, { status: listRes.status })
+    const body = await listRes.json().catch(() => ({}))
+    return NextResponse.json(
+      { error: `Failed to fetch calendar list (${listRes.status}): ${body?.error?.message ?? listRes.statusText}` },
+      { status: listRes.status }
+    )
   }
   const listData = await listRes.json()
   const calendarIds: string[] = (listData.items ?? []).map((c: { id: string }) => c.id)
