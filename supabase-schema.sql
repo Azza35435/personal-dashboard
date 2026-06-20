@@ -94,6 +94,42 @@ CREATE TABLE gym_exercises (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE curriculars (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  color TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- curricular_id links a section to its parent curricular (nullable, one-to-one)
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS curricular_id UUID REFERENCES curriculars(id) ON DELETE SET NULL;
+
+CREATE TABLE curricular_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curricular_id UUID NOT NULL REFERENCES curriculars(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  value TEXT NOT NULL DEFAULT '',
+  unit TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE curricular_notes (
+  curricular_id UUID PRIMARY KEY REFERENCES curriculars(id) ON DELETE CASCADE,
+  content TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE curricular_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curricular_id UUID NOT NULL REFERENCES curriculars(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable Row Level Security (open for now, tighten later when you add auth)
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE income_streams ENABLE ROW LEVEL SECURITY;
@@ -119,3 +155,11 @@ ALTER TABLE gym_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gym_exercises ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON gym_sessions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON gym_exercises FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE curriculars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricular_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricular_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricular_links ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON curriculars FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON curricular_metrics FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON curricular_notes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON curricular_links FOR ALL USING (true) WITH CHECK (true);

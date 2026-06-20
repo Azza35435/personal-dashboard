@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/health', label: 'Health', icon: '💪' },
   { href: '/habits', label: 'Habits', icon: '✓' },
   { href: '/notes', label: 'Notes', icon: '📝' },
+  { href: '/curriculars', label: 'Curriculars', icon: '🎓' },
 ]
 
 export default function Sidebar() {

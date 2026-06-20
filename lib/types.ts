@@ -66,6 +66,34 @@ export interface Section {
   color: string | null
   position: number
   created_at: string
+  curricular_id?: string | null
+}
+
+export interface Curricular {
+  id: string
+  name: string
+  color: string | null
+  position: number
+  created_at: string
+}
+
+export interface CurricularMetric {
+  id: string
+  curricular_id: string
+  label: string
+  value: string
+  unit: string | null
+  position: number
+  created_at: string
+}
+
+export interface CurricularLink {
+  id: string
+  curricular_id: string
+  title: string
+  url: string
+  position: number
+  created_at: string
 }
 
 export interface CalendarEvent {

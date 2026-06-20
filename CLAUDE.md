@@ -61,6 +61,16 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **Progress bars**: each macro tile shows a thin progress bar (`h-1`) and `/ target` label. Bar turns `bg-red-300` when the total exceeds the target.
 - **`load` as `useCallback`**: depends on `dateOffset`; `useEffect` runs on `[load]`.
 
+#### CurricularsWidget (`components/widgets/CurricularsWidget.tsx`)
+
+- **Purpose**: tracks life areas / co-curriculars (e.g. New Property Group, D Swimming). Lives at `/curriculars`.
+- **Tab bar**: each curricular is a tab. Switching tabs auto-saves the current note before loading the new curricular's content.
+- **Todo link**: each curricular can be linked to exactly one todo section via `sections.curricular_id`. Todos from that section appear in the curricular's Tasks panel. Adding a todo in the curricular view inserts it into the linked section — it also appears in the TodoWidget's sections view. When adding a new curricular you choose "Create new section" (creates a fresh section) or "Link existing section" (picks from unlinked sections). Deleting a curricular unlinks (does not delete) its section.
+- **Metrics**: editable key-value pairs per curricular (`curricular_metrics` table). Unit can be `$`, `hrs`, or none. Click a value to edit inline.
+- **Notes**: single auto-saving textarea per curricular (`curricular_notes` table, `curricular_id` is PK). Saves on blur and on tab change.
+- **Links**: list of (title, URL) pairs (`curricular_links` table). URLs auto-prefixed with `https://` if missing.
+- **`load` as `useCallback`**: depends on `selectedId`; the `useEffect` depends on `load`, so switching tabs automatically triggers a re-fetch.
+
 #### WeekCalendar (`components/widgets/WeekCalendar.tsx`)
 
 - Shows events from **all Google Calendars** (not just primary) by first fetching `calendarList` then parallel-fetching events per calendar in `/api/calendar`.
@@ -97,11 +107,13 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`). Eac
 
 ### Database schema
 
-Ten Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Fifteen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 - `todos` has a `position INTEGER NOT NULL DEFAULT 0` column for drag-and-drop ordering within priority groups and unsectioned lists.
 - `sections` has `color TEXT` (nullable hex string, e.g. `#3b82f6`) and `position INTEGER NOT NULL DEFAULT 0` for drag-to-reorder.
 - `todo_sections` is a many-to-many junction between todos and sections (todo_id, section_id, position) — `position` drives per-section drag-and-drop order. Both cascade-delete on parent row removal.
+
+**`sections`** has a nullable `curricular_id UUID` column (FK to `curriculars.id`, `ON DELETE SET NULL`) that links a section to its parent curricular.
 
 **If setting up from scratch**, run `supabase-schema.sql` in the Supabase SQL editor. If migrating an existing DB, also run:
 ```sql
@@ -130,6 +142,45 @@ ALTER TABLE gym_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gym_exercises ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON gym_sessions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON gym_exercises FOR ALL USING (true) WITH CHECK (true);
+-- Curriculars tables (added for /curriculars page):
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS curricular_id UUID REFERENCES curriculars(id) ON DELETE SET NULL;
+CREATE TABLE IF NOT EXISTS curriculars (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  color TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS curricular_metrics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curricular_id UUID NOT NULL REFERENCES curriculars(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  value TEXT NOT NULL DEFAULT '',
+  unit TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS curricular_notes (
+  curricular_id UUID PRIMARY KEY REFERENCES curriculars(id) ON DELETE CASCADE,
+  content TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS curricular_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curricular_id UUID NOT NULL REFERENCES curriculars(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE curriculars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricular_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricular_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricular_links ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON curriculars FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON curricular_metrics FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON curricular_notes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON curricular_links FOR ALL USING (true) WITH CHECK (true);
 ```
 
 ## Environment variables
