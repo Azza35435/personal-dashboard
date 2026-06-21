@@ -61,6 +61,16 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **Progress bars**: each macro tile shows a thin progress bar (`h-1`) and `/ target` label. Bar turns `bg-red-300` when the total exceeds the target.
 - **`load` as `useCallback`**: depends on `dateOffset`; `useEffect` runs on `[load]`.
 
+#### CookbookWidget (`components/widgets/CookbookWidget.tsx`)
+
+- **Location**: third column on the Health page (`w-72`, amber theme), alongside Gym and Nutrition.
+- **Recipe fields**: name, category (breakfast/lunch/dinner/snack), tried/untried, ingredients (freetext), macros (calories/protein/carbs/fat), notes.
+- **Filtering**: search bar (by name), category filter chips, "Untried only" toggle.
+- **Expand/collapse**: clicking a recipe card reveals ingredients, macros grid, notes, and a "Log to today" button.
+- **Log to today**: inserts the recipe's macros into `nutrition_logs` for today's date — same insert pattern as NutritionWidget's `addLog`.
+- **Tried toggle**: circular checkbox on each card flips `tried` in Supabase without opening the card.
+- **`load` as `useCallback`**: no dependencies; called once on mount and after every mutation.
+
 #### CurricularsWidget (`components/widgets/CurricularsWidget.tsx`)
 
 - **Purpose**: tracks life areas / co-curriculars (e.g. New Property Group, D Swimming). Lives at `/curriculars`.
@@ -107,7 +117,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`). Eac
 
 ### Database schema
 
-Fifteen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Sixteen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `cookbook_recipes`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 - `todos` has a `position INTEGER NOT NULL DEFAULT 0` column for drag-and-drop ordering within priority groups and unsectioned lists.
 - `sections` has `color TEXT` (nullable hex string, e.g. `#3b82f6`) and `position INTEGER NOT NULL DEFAULT 0` for drag-to-reorder.

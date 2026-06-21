@@ -94,6 +94,20 @@ CREATE TABLE gym_exercises (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE cookbook_recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'dinner' CHECK (category IN ('breakfast','lunch','dinner','snack')),
+  tried BOOLEAN NOT NULL DEFAULT false,
+  ingredients TEXT,
+  calories INTEGER DEFAULT 0,
+  protein DECIMAL(6,1) DEFAULT 0,
+  carbs DECIMAL(6,1) DEFAULT 0,
+  fat DECIMAL(6,1) DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE curriculars (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -159,6 +173,8 @@ ALTER TABLE curriculars ENABLE ROW LEVEL SECURITY;
 ALTER TABLE curricular_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE curricular_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE curricular_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cookbook_recipes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON cookbook_recipes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curriculars FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_metrics FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_notes FOR ALL USING (true) WITH CHECK (true);

@@ -123,3 +123,19 @@ export interface GymExercise {
   position: number
   created_at: string
 }
+
+export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+
+export interface CookbookRecipe {
+  id: string
+  name: string
+  category: RecipeCategory
+  tried: boolean
+  ingredients: string | null
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  notes: string | null
+  created_at: string
+}

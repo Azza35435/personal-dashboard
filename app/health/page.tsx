@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 
 const GymWidget = dynamic(() => import('@/components/widgets/GymWidget'), { ssr: false })
 const NutritionWidget = dynamic(() => import('@/components/widgets/NutritionWidget'), { ssr: false })
+const CookbookWidget = dynamic(() => import('@/components/widgets/CookbookWidget'), { ssr: false })
 
 export default function HealthPage() {
   return (
@@ -11,8 +12,11 @@ export default function HealthPage() {
       <div className="flex-1 overflow-auto min-w-0">
         <GymWidget />
       </div>
-      <div className="w-80 flex-shrink-0 overflow-auto">
+      <div className="w-72 flex-shrink-0 overflow-auto">
         <NutritionWidget />
+      </div>
+      <div className="w-72 flex-shrink-0 overflow-hidden flex flex-col">
+        <CookbookWidget />
       </div>
     </div>
   )
