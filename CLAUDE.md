@@ -47,12 +47,15 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 
 #### GymWidget (`components/widgets/GymWidget.tsx`)
 
-- **Two views**: "Week" (current calendar week, Mon–Sun, with prev/next arrows) and "All" (last 50 sessions, newest first). Toggle via button in header.
-- **Session structure**: header (workout type + date + optional duration), collapsible exercise list below.
-- **Exercises**: name, sets, reps, weight (kg). Added inline via "+ Add exercise" when a session is expanded.
-- **Accent colour picker**: ⚙ gear icon in header opens a swatch panel; selected border accent stored in `localStorage` under key `gym_widget_border`. Default is `border-l-blue-400`. The picker sets the left border accent colour only — the widget background is always white/dark-gray like all other widgets.
-- **`load` as `useCallback`**: depends on `viewAll` and `weekOffset`; the `useEffect` depends on `load`, so changing either view state automatically triggers a re-fetch. Mutations call `load()` directly after await.
-- **Week navigation**: forward arrow disabled at `weekOffset >= 0` to prevent navigating to future weeks.
+- **Three views**: "Month" (default, mini monthly calendar), "Week" (Mon–Sun), "All" (last 50 sessions). Tab strip in header.
+- **Month view**: calendar grid, Mon–Sun columns. Each day cell: day number with green/orange nutrition tint (see below) + 5px coloured stripe at bottom = session colour. Click a session day → slide-in detail panel below grid. Click empty day → slide-in add-session form pre-filled with that date. Month `‹/›` navigation; forward disabled at `monthOffset >= 0`.
+- **Nutrition overlay** (month only): fetches `nutrition_logs` for the month + reads `nutrition_targets` from `localStorage`. Green tint = calories ≥ target AND protein ≥ target; orange = food logged but targets missed; no tint = nothing logged. Legend shown below grid.
+- **Session colour**: per-session `color` field in `gym_sessions` (one of: blue/violet/rose/orange/emerald/amber/teal/slate). Shown as bottom stripe (month) or coloured left border on session cards (week/all). Colour picker appears in add-session form.
+- **Templates**: any session can be saved as a named template ("Save template" button). Stored in `gym_templates` + `gym_template_exercises`. "Load template →" in add-session form pre-fills workout_type + colour + auto-inserts exercises after save. Template list supports delete.
+- **Slide-in panel** (month): coloured left stripe, workout type, date/duration, full exercise list (sets×reps weight), "Save template" + "Delete", inline "+ Add exercise" form.
+- **Week/All session cards**: coloured left border (3px). Hover shows "template" and "×". Expand for exercise list.
+- **Accent colour picker**: ⚙ gear icon → swatch panel for widget border only. `localStorage` key `gym_widget_border`. Default `border-l-blue-400`.
+- **`load`/`loadMonthNutrition`** as `useCallback`: both depend on `view` + respective offsets. `loadMonthNutrition` no-ops when not in month view.
 
 #### NutritionWidget (`components/widgets/NutritionWidget.tsx`)
 
@@ -165,6 +168,28 @@ ALTER TABLE gym_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gym_exercises ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON gym_sessions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON gym_exercises FOR ALL USING (true) WITH CHECK (true);
+-- Gym session colour + templates (added for monthly calendar view):
+ALTER TABLE gym_sessions ADD COLUMN IF NOT EXISTS color TEXT DEFAULT 'blue';
+CREATE TABLE IF NOT EXISTS gym_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  workout_type TEXT NOT NULL,
+  color TEXT DEFAULT 'blue',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS gym_template_exercises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  template_id UUID NOT NULL REFERENCES gym_templates(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  sets INTEGER,
+  reps INTEGER,
+  weight_kg DECIMAL(6,2),
+  position INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE gym_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gym_template_exercises ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_templates FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON gym_template_exercises FOR ALL USING (true) WITH CHECK (true);
 -- Curriculars tables (added for /curriculars page):
 ALTER TABLE sections ADD COLUMN IF NOT EXISTS curricular_id UUID REFERENCES curriculars(id) ON DELETE SET NULL;
 CREATE TABLE IF NOT EXISTS curriculars (

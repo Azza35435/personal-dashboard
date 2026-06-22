@@ -110,6 +110,7 @@ export interface GymSession {
   workout_type: string
   duration_minutes: number | null
   notes: string | null
+  color: string | null
   created_at: string
 }
 
@@ -122,6 +123,24 @@ export interface GymExercise {
   weight_kg: number | null
   position: number
   created_at: string
+}
+
+export interface GymTemplate {
+  id: string
+  name: string
+  workout_type: string
+  color: string | null
+  created_at: string
+}
+
+export interface GymTemplateExercise {
+  id: string
+  template_id: string
+  name: string
+  sets: number | null
+  reps: number | null
+  weight_kg: number | null
+  position: number
 }
 
 export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'
