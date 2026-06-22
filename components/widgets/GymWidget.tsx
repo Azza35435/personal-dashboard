@@ -105,6 +105,10 @@ export default function GymWidget() {
   const [addingExerciseTo, setAddingExerciseTo] = useState<string | null>(null)
   const [exerciseForm, setExerciseForm] = useState(EMPTY_EX)
 
+  // Exercise edit
+  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null)
+  const [editingExerciseForm, setEditingExerciseForm] = useState(EMPTY_EX)
+
   // Week/All expand state
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -246,6 +250,28 @@ export default function GymWidget() {
 
   const deleteExercise = async (id: string) => {
     await supabase.from('gym_exercises').delete().eq('id', id)
+    load()
+  }
+
+  const startEditExercise = (ex: GymExercise) => {
+    setEditingExerciseId(ex.id)
+    setEditingExerciseForm({
+      name: ex.name,
+      sets: ex.sets != null ? String(ex.sets) : '',
+      reps: ex.reps != null ? String(ex.reps) : '',
+      weight_kg: ex.weight_kg != null ? String(ex.weight_kg) : '',
+    })
+  }
+
+  const saveEditExercise = async (id: string) => {
+    if (!editingExerciseForm.name.trim()) return
+    await supabase.from('gym_exercises').update({
+      name: editingExerciseForm.name.trim(),
+      sets: parseInt(editingExerciseForm.sets) || null,
+      reps: parseInt(editingExerciseForm.reps) || null,
+      weight_kg: parseFloat(editingExerciseForm.weight_kg) || null,
+    }).eq('id', id)
+    setEditingExerciseId(null)
     load()
   }
 
@@ -609,16 +635,46 @@ export default function GymWidget() {
                   <div className="space-y-1">
                     {selectedExercises.length === 0 && <p className="text-xs text-gray-400">No exercises logged.</p>}
                     {selectedExercises.map(ex => (
-                      <div key={ex.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded px-2.5 py-1.5 border border-gray-100 dark:border-gray-700 group/ex">
-                        <p className="text-sm flex-1 truncate">{ex.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
-                          {[
-                            ex.sets != null && ex.reps != null ? `${ex.sets}×${ex.reps}` : null,
-                            ex.weight_kg != null ? `${ex.weight_kg}kg` : null,
-                          ].filter(Boolean).join(' @ ')}
-                        </p>
-                        <button onClick={() => deleteExercise(ex.id)} className="opacity-0 group-hover/ex:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none ml-2 transition">×</button>
-                      </div>
+                      editingExerciseId === ex.id ? (
+                        <div key={ex.id} className="space-y-1 bg-white dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-600">
+                          <input
+                            autoFocus
+                            className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                            value={editingExerciseForm.name}
+                            onChange={e => setEditingExerciseForm(f => ({ ...f, name: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') saveEditExercise(ex.id); if (e.key === 'Escape') setEditingExerciseId(null) }}
+                          />
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {([{ field: 'sets' as const, placeholder: 'Sets' }, { field: 'reps' as const, placeholder: 'Reps' }, { field: 'weight_kg' as const, placeholder: 'kg' }]).map(({ field, placeholder }) => (
+                              <input
+                                key={field}
+                                type="number" min="0"
+                                step={field === 'weight_kg' ? '0.5' : '1'}
+                                className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-center placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                                placeholder={placeholder}
+                                value={editingExerciseForm[field]}
+                                onChange={e => setEditingExerciseForm(f => ({ ...f, [field]: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter') saveEditExercise(ex.id); if (e.key === 'Escape') setEditingExerciseId(null) }}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={() => setEditingExerciseId(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
+                            <button onClick={() => saveEditExercise(ex.id)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1 rounded transition">Save</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div key={ex.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded px-2.5 py-1.5 border border-gray-100 dark:border-gray-700 group/ex cursor-pointer hover:border-gray-300 dark:hover:border-gray-500 transition" onClick={() => startEditExercise(ex)}>
+                          <p className="text-sm flex-1 truncate">{ex.name}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
+                            {[
+                              ex.sets != null && ex.reps != null ? `${ex.sets}×${ex.reps}` : null,
+                              ex.weight_kg != null ? `${ex.weight_kg}kg` : null,
+                            ].filter(Boolean).join(' @ ')}
+                          </p>
+                          <button onClick={e => { e.stopPropagation(); deleteExercise(ex.id) }} className="opacity-0 group-hover/ex:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none ml-2 transition">×</button>
+                        </div>
+                      )
                     ))}
                   </div>
                   <ExerciseAddForm sessionId={selectedSession.id} />
@@ -769,16 +825,46 @@ export default function GymWidget() {
                     {isExpanded && (
                       <div className="px-3 pb-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
                         {exs.map(ex => (
-                          <div key={ex.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded px-2.5 py-1.5 group/ex border border-gray-100 dark:border-gray-700">
-                            <p className="text-sm flex-1 truncate">{ex.name}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
-                              {[
-                                ex.sets != null && ex.reps != null ? `${ex.sets}×${ex.reps}` : null,
-                                ex.weight_kg != null ? `${ex.weight_kg}kg` : null,
-                              ].filter(Boolean).join(' @ ')}
-                            </p>
-                            <button onClick={() => deleteExercise(ex.id)} className="opacity-0 group-hover/ex:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none ml-2 transition">×</button>
-                          </div>
+                          editingExerciseId === ex.id ? (
+                            <div key={ex.id} className="space-y-1 bg-white dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-600">
+                              <input
+                                autoFocus
+                                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                                value={editingExerciseForm.name}
+                                onChange={e => setEditingExerciseForm(f => ({ ...f, name: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter') saveEditExercise(ex.id); if (e.key === 'Escape') setEditingExerciseId(null) }}
+                              />
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {([{ field: 'sets' as const, placeholder: 'Sets' }, { field: 'reps' as const, placeholder: 'Reps' }, { field: 'weight_kg' as const, placeholder: 'kg' }]).map(({ field, placeholder }) => (
+                                  <input
+                                    key={field}
+                                    type="number" min="0"
+                                    step={field === 'weight_kg' ? '0.5' : '1'}
+                                    className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-center placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                                    placeholder={placeholder}
+                                    value={editingExerciseForm[field]}
+                                    onChange={e => setEditingExerciseForm(f => ({ ...f, [field]: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveEditExercise(ex.id); if (e.key === 'Escape') setEditingExerciseId(null) }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <button onClick={() => setEditingExerciseId(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
+                                <button onClick={() => saveEditExercise(ex.id)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1 rounded transition">Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div key={ex.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded px-2.5 py-1.5 group/ex border border-gray-100 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-500 transition" onClick={() => startEditExercise(ex)}>
+                              <p className="text-sm flex-1 truncate">{ex.name}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
+                                {[
+                                  ex.sets != null && ex.reps != null ? `${ex.sets}×${ex.reps}` : null,
+                                  ex.weight_kg != null ? `${ex.weight_kg}kg` : null,
+                                ].filter(Boolean).join(' @ ')}
+                              </p>
+                              <button onClick={e => { e.stopPropagation(); deleteExercise(ex.id) }} className="opacity-0 group-hover/ex:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none ml-2 transition">×</button>
+                            </div>
+                          )
                         ))}
                         <ExerciseAddForm sessionId={session.id} />
                       </div>
