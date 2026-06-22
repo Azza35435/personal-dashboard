@@ -24,14 +24,14 @@ export default function NetWorthWidget() {
   }, 0)
 
   return (
-    <div className="rounded p-5 flex flex-col gap-2 h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-emerald-400 shadow-sm text-gray-900 dark:text-gray-100">
-      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Net Worth</p>
+    <div className="rounded-2xl p-5 flex flex-col gap-2 h-full bg-emerald-500 text-white">
+      <p className="text-sm font-semibold uppercase tracking-wider opacity-80">Net Worth</p>
       {loading ? (
-        <div className="animate-pulse h-10 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+        <div className="animate-pulse h-10 bg-white/20 rounded-lg w-32" />
       ) : (
         <p className="text-4xl font-bold">{formatCurrency(netWorth)}</p>
       )}
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-auto">
+      <p className="text-xs opacity-70 mt-auto">
         Across {accounts.length} account{accounts.length !== 1 ? 's' : ''}
       </p>
     </div>

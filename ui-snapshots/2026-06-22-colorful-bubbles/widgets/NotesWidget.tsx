@@ -36,16 +36,16 @@ export default function NotesWidget() {
   }
 
   return (
-    <div className="rounded p-5 flex flex-col gap-2 h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-slate-400 shadow-sm text-gray-900 dark:text-gray-100">
+    <div className="rounded-2xl p-5 flex flex-col gap-2 h-full bg-sky-500 text-white">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Notes</p>
-        <span className="text-xs text-gray-400 dark:text-gray-500">{saved ? 'Saved' : 'Saving…'}</span>
+        <p className="text-sm font-semibold uppercase tracking-wider opacity-80">Notes</p>
+        <span className="text-xs opacity-50">{saved ? 'Saved' : 'Saving…'}</span>
       </div>
       {loading ? (
-        <div className="animate-pulse flex-1 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="animate-pulse flex-1 bg-white/20 rounded-xl" />
       ) : (
         <textarea
-          className="flex-1 bg-gray-50 dark:bg-gray-800 rounded p-3 text-sm resize-none outline-none placeholder-gray-400 focus:bg-gray-100 dark:focus:bg-gray-700 border border-gray-100 dark:border-gray-700 transition leading-relaxed text-gray-800 dark:text-gray-200"
+          className="flex-1 bg-white/10 rounded-xl p-3 text-sm resize-none outline-none placeholder-white/40 focus:bg-white/20 transition leading-relaxed"
           placeholder="Jot something down…"
           value={content}
           onChange={(e) => handleChange(e.target.value)}

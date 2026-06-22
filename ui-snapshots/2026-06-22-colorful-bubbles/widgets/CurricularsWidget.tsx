@@ -229,9 +229,9 @@ export default function CurricularsWidget() {
 
   if (loading) {
     return (
-      <div className="rounded p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-violet-400 shadow-sm h-full flex items-center justify-center">
+      <div className="rounded-2xl p-5 bg-violet-600 text-white h-full flex items-center justify-center">
         <div className="space-y-2 w-full max-w-sm">
-          {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-8 bg-gray-200 dark:bg-gray-700 rounded" />)}
+          {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-8 bg-white/20 rounded-lg" />)}
         </div>
       </div>
     )
@@ -241,21 +241,21 @@ export default function CurricularsWidget() {
   const completedTodos = todos.filter(t => t.completed)
 
   return (
-    <div className="rounded p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-violet-400 shadow-sm text-gray-900 dark:text-gray-100 h-full flex flex-col gap-4 overflow-hidden">
+    <div className="rounded-2xl p-5 bg-violet-600 text-white h-full flex flex-col gap-4 overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Curriculars</p>
+          <p className="text-sm font-semibold uppercase tracking-wider opacity-80">Curriculars</p>
           {linkedSection && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="text-xs opacity-50">
               {activeTodos.length} task{activeTodos.length !== 1 ? 's' : ''} remaining
             </p>
           )}
         </div>
         <button
           onClick={() => setAddingCurricular(p => !p)}
-          className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+          className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition"
         >
           {addingCurricular ? 'Cancel' : '+ Add'}
         </button>
@@ -263,10 +263,10 @@ export default function CurricularsWidget() {
 
       {/* Add curricular form */}
       {addingCurricular && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2.5 flex-shrink-0 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white/10 rounded-xl p-3 space-y-2.5 flex-shrink-0">
           <div className="flex items-center gap-2">
             <label
-              className="relative w-8 h-8 rounded-full flex-shrink-0 cursor-pointer border-2 border-gray-300 dark:border-gray-600"
+              className="relative w-8 h-8 rounded-full flex-shrink-0 cursor-pointer border-2 border-white/30"
               style={{ backgroundColor: newCurColor }}
               title="Pick colour"
             >
@@ -279,42 +279,42 @@ export default function CurricularsWidget() {
             </label>
             <input
               autoFocus
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+              className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
               placeholder="Name (e.g. New Property Group)"
               value={newCurName}
               onChange={e => setNewCurName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addCurricular()}
             />
           </div>
-          <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-700 rounded p-0.5 border border-gray-200 dark:border-gray-600">
+          <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
             <button
               onClick={() => setLinkMode('new')}
-              className={`flex-1 text-xs py-1.5 rounded transition ${linkMode === 'new' ? 'bg-white dark:bg-gray-900 font-medium shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              className={`flex-1 text-xs py-1.5 rounded-md transition ${linkMode === 'new' ? 'bg-white/25 font-medium' : 'hover:bg-white/10'}`}
             >
               Create new section
             </button>
             <button
               onClick={() => setLinkMode('existing')}
-              className={`flex-1 text-xs py-1.5 rounded transition ${linkMode === 'existing' ? 'bg-white dark:bg-gray-900 font-medium shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+              className={`flex-1 text-xs py-1.5 rounded-md transition ${linkMode === 'existing' ? 'bg-white/25 font-medium' : 'hover:bg-white/10'}`}
             >
               Link existing section
             </button>
           </div>
           {linkMode === 'existing' && (
             <select
-              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+              className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm outline-none"
               value={linkSectionId}
               onChange={e => setLinkSectionId(e.target.value)}
             >
-              <option value="">— pick a section —</option>
+              <option value="" className="text-black">— pick a section —</option>
               {unlinkedSections.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id} className="text-black">{s.name}</option>
               ))}
             </select>
           )}
           <button
             onClick={addCurricular}
-            className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1.5 rounded hover:opacity-90 transition"
+            className="w-full bg-white text-violet-700 font-semibold text-sm py-1.5 rounded-lg hover:bg-white/90 transition"
           >
             Create
           </button>
@@ -323,19 +323,16 @@ export default function CurricularsWidget() {
 
       {/* Tabs */}
       {curriculars.length === 0 ? (
-        <p className="text-sm text-gray-400">No curriculars yet. Add one to get started.</p>
+        <p className="text-sm opacity-60">No curriculars yet. Add one to get started.</p>
       ) : (
         <>
-          <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded p-1 flex-shrink-0 overflow-x-auto border border-gray-200 dark:border-gray-700">
+          <div className="flex gap-1 bg-white/10 rounded-xl p-1 flex-shrink-0 overflow-x-auto">
             {curriculars.map(c => (
               <button
                 key={c.id}
                 onClick={() => handleTabChange(c.id)}
-                className={`text-xs px-3 py-1.5 rounded whitespace-nowrap transition font-medium flex-shrink-0 ${
-                  selectedId === c.id
-                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition font-medium flex-shrink-0
+                  ${selectedId === c.id ? 'bg-white text-violet-700' : 'hover:bg-white/20'}`}
               >
                 {c.name}
               </button>
@@ -349,12 +346,12 @@ export default function CurricularsWidget() {
               {/* Left: Tasks */}
               <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between flex-shrink-0">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Tasks</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider opacity-70">Tasks</p>
                   <div className="flex items-center gap-2">
                     {completedTodos.length > 0 && (
                       <button
                         onClick={() => setShowCompleted(p => !p)}
-                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        className="text-xs opacity-50 hover:opacity-100 transition"
                       >
                         {showCompleted ? 'Hide done' : `${completedTodos.length} done`}
                       </button>
@@ -362,7 +359,7 @@ export default function CurricularsWidget() {
                     <button
                       onClick={() => setAddingTodo(p => !p)}
                       disabled={!linkedSection}
-                      className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+                      className="text-xs bg-white/20 hover:bg-white/30 disabled:opacity-30 px-2.5 py-1 rounded-full transition"
                       title={linkedSection ? undefined : 'No todo section linked to this curricular'}
                     >
                       + Add task
@@ -371,16 +368,16 @@ export default function CurricularsWidget() {
                 </div>
 
                 {!linkedSection && (
-                  <p className="text-xs text-gray-400 italic">
+                  <p className="text-xs opacity-50 italic">
                     No todo section linked. Delete and re-add this curricular to link one.
                   </p>
                 )}
 
                 {addingTodo && (
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 flex-shrink-0 border border-gray-200 dark:border-gray-700">
+                  <div className="bg-white/10 rounded-xl p-3 space-y-2 flex-shrink-0">
                     <input
                       autoFocus
-                      className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                      className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
                       placeholder="Task title"
                       value={newTodoTitle}
                       onChange={e => setNewTodoTitle(e.target.value)}
@@ -391,11 +388,8 @@ export default function CurricularsWidget() {
                         <button
                           key={p}
                           onClick={() => setNewTodoPriority(p)}
-                          className={`flex-1 text-xs py-1 rounded capitalize transition border ${
-                            newTodoPriority === p
-                              ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 font-semibold'
-                              : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
+                          className={`flex-1 text-xs py-1 rounded-lg capitalize transition
+                            ${newTodoPriority === p ? 'bg-white/30 font-semibold' : 'bg-white/10 hover:bg-white/20'}`}
                         >
                           {p}
                         </button>
@@ -403,7 +397,7 @@ export default function CurricularsWidget() {
                     </div>
                     <button
                       onClick={addTodo}
-                      className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1.5 rounded hover:opacity-90 transition"
+                      className="w-full bg-white text-violet-700 font-semibold text-sm py-1.5 rounded-lg hover:bg-white/90 transition"
                     >
                       Save
                     </button>
@@ -412,23 +406,23 @@ export default function CurricularsWidget() {
 
                 <div className="flex flex-col gap-1.5 overflow-y-auto flex-1 pr-0.5">
                   {activeTodos.length === 0 && !addingTodo && (
-                    <p className="text-sm text-gray-400">No tasks. Add one above.</p>
+                    <p className="text-sm opacity-50">No tasks. Add one above.</p>
                   )}
                   {activeTodos.map(t => (
                     <div
                       key={t.id}
-                      className="flex items-start gap-2.5 rounded px-3 py-2 group bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 select-none"
+                      className="flex items-start gap-2.5 rounded-xl px-3 py-2 group bg-white/10 select-none"
                     >
                       <button
                         onClick={() => toggleTodo(t)}
-                        className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-gray-400 transition"
+                        className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-white/50 flex items-center justify-center hover:bg-white/20 transition"
                       />
                       <p className="flex-1 text-sm leading-tight">{t.title}</p>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <div className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[t.priority]}`} />
                         <button
                           onClick={() => deleteTodo(t.id)}
-                          className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition"
+                          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition"
                         >
                           ×
                         </button>
@@ -438,18 +432,18 @@ export default function CurricularsWidget() {
                   {showCompleted && completedTodos.map(t => (
                     <div
                       key={t.id}
-                      className="flex items-start gap-2.5 rounded px-3 py-2 group bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 select-none"
+                      className="flex items-start gap-2.5 rounded-xl px-3 py-2 group bg-white/5 select-none"
                     >
                       <button
                         onClick={() => toggleTodo(t)}
-                        className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-gray-400 bg-gray-200 dark:bg-gray-600 dark:border-gray-500 flex items-center justify-center transition"
+                        className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-white/50 flex items-center justify-center bg-white/30 transition"
                       >
-                        <span className="text-gray-500 dark:text-gray-400 text-xs font-bold leading-none">✓</span>
+                        <span className="text-violet-300 text-xs font-bold leading-none">✓</span>
                       </button>
-                      <p className="flex-1 text-sm leading-tight text-gray-400 dark:text-gray-500 line-through">{t.title}</p>
+                      <p className="flex-1 text-sm leading-tight opacity-50 line-through">{t.title}</p>
                       <button
                         onClick={() => deleteTodo(t.id)}
-                        className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs flex-shrink-0 transition"
+                        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs flex-shrink-0 transition"
                       >
                         ×
                       </button>
@@ -457,10 +451,10 @@ export default function CurricularsWidget() {
                   ))}
                 </div>
 
-                <div className="flex-shrink-0 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex-shrink-0 pt-2 border-t border-white/10">
                   <button
                     onClick={() => deleteCurricular(selected.id)}
-                    className="text-xs text-gray-400 hover:text-red-500 transition"
+                    className="text-xs opacity-30 hover:opacity-70 transition"
                   >
                     Delete curricular
                   </button>
@@ -473,35 +467,35 @@ export default function CurricularsWidget() {
                 {/* Metrics */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Metrics</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider opacity-70">Metrics</p>
                     <button
                       onClick={() => setAddingMetric(p => !p)}
-                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      className="text-xs opacity-50 hover:opacity-100 transition"
                     >
                       {addingMetric ? 'Cancel' : '+ Add'}
                     </button>
                   </div>
                   {addingMetric && (
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 mb-2 border border-gray-200 dark:border-gray-700">
+                    <div className="bg-white/10 rounded-xl p-3 space-y-2 mb-2">
                       <input
                         autoFocus
-                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                        className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
                         placeholder="Label (e.g. Revenue)"
                         value={newMetricLabel}
                         onChange={e => setNewMetricLabel(e.target.value)}
                       />
                       <div className="flex gap-2">
                         <select
-                          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-xs text-gray-900 dark:text-gray-100 outline-none w-16 flex-shrink-0"
+                          className="bg-white/20 rounded-lg px-2 py-1.5 text-xs outline-none w-16 flex-shrink-0"
                           value={newMetricUnit}
                           onChange={e => setNewMetricUnit(e.target.value)}
                         >
-                          <option value="$">$</option>
-                          <option value="hrs">hrs</option>
-                          <option value="">none</option>
+                          <option value="$" className="text-black">$</option>
+                          <option value="hrs" className="text-black">hrs</option>
+                          <option value="" className="text-black">none</option>
                         </select>
                         <input
-                          className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                          className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
                           placeholder="Value"
                           value={newMetricValue}
                           onChange={e => setNewMetricValue(e.target.value)}
@@ -510,7 +504,7 @@ export default function CurricularsWidget() {
                       </div>
                       <button
                         onClick={addMetric}
-                        className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1 rounded hover:opacity-90 transition"
+                        className="w-full bg-white text-violet-700 font-semibold text-sm py-1 rounded-lg hover:bg-white/90 transition"
                       >
                         Save
                       </button>
@@ -518,12 +512,12 @@ export default function CurricularsWidget() {
                   )}
                   <div className="grid grid-cols-2 gap-2">
                     {metrics.map(m => (
-                      <div key={m.id} className="bg-gray-50 dark:bg-gray-800 rounded p-2.5 group relative border border-gray-100 dark:border-gray-700">
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 truncate">{m.label}</p>
+                      <div key={m.id} className="bg-white/10 rounded-xl p-2.5 group relative">
+                        <p className="text-xs opacity-60 mb-0.5 truncate">{m.label}</p>
                         {editingMetricId === m.id ? (
                           <input
                             autoFocus
-                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1 py-0.5 text-sm font-semibold outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                            className="w-full bg-white/20 rounded px-1 py-0.5 text-sm font-semibold outline-none"
                             value={editingMetricValue}
                             onChange={e => setEditingMetricValue(e.target.value)}
                             onBlur={() => saveMetricValue(m.id, editingMetricValue)}
@@ -542,23 +536,23 @@ export default function CurricularsWidget() {
                         )}
                         <button
                           onClick={() => deleteMetric(m.id)}
-                          className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition leading-none"
+                          className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 text-xs transition leading-none"
                         >
                           ×
                         </button>
                       </div>
                     ))}
                     {metrics.length === 0 && !addingMetric && (
-                      <p className="text-xs text-gray-400 col-span-2">No metrics yet</p>
+                      <p className="text-xs opacity-40 col-span-2">No metrics yet</p>
                     )}
                   </div>
                 </div>
 
                 {/* Notes */}
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Notes</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider opacity-70 mb-2">Notes</p>
                   <textarea
-                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded px-3 py-2.5 text-sm placeholder-gray-400 outline-none resize-none text-gray-800 dark:text-gray-200 focus:border-gray-400 transition"
+                    className="w-full bg-white/10 rounded-xl px-3 py-2.5 text-sm placeholder-white/40 outline-none resize-none"
                     style={{ minHeight: '7rem' }}
                     placeholder="Notes about this curricular..."
                     value={noteContent}
@@ -570,25 +564,25 @@ export default function CurricularsWidget() {
                 {/* Links */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Links</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider opacity-70">Links</p>
                     <button
                       onClick={() => setAddingLink(p => !p)}
-                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      className="text-xs opacity-50 hover:opacity-100 transition"
                     >
                       {addingLink ? 'Cancel' : '+ Add'}
                     </button>
                   </div>
                   {addingLink && (
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 mb-2 border border-gray-200 dark:border-gray-700">
+                    <div className="bg-white/10 rounded-xl p-3 space-y-2 mb-2">
                       <input
                         autoFocus
-                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                        className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
                         placeholder="Title"
                         value={newLinkTitle}
                         onChange={e => setNewLinkTitle(e.target.value)}
                       />
                       <input
-                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                        className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
                         placeholder="URL (e.g. docs.google.com/…)"
                         value={newLinkUrl}
                         onChange={e => setNewLinkUrl(e.target.value)}
@@ -596,7 +590,7 @@ export default function CurricularsWidget() {
                       />
                       <button
                         onClick={addLink}
-                        className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1 rounded hover:opacity-90 transition"
+                        className="w-full bg-white text-violet-700 font-semibold text-sm py-1 rounded-lg hover:bg-white/90 transition"
                       >
                         Save
                       </button>
@@ -604,25 +598,25 @@ export default function CurricularsWidget() {
                   )}
                   <div className="flex flex-col gap-1.5">
                     {links.map(l => (
-                      <div key={l.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded px-3 py-2 group border border-gray-100 dark:border-gray-700">
+                      <div key={l.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2 group">
                         <a
                           href={l.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 text-sm hover:underline truncate text-gray-900 dark:text-gray-100"
+                          className="flex-1 text-sm hover:underline truncate"
                         >
                           {l.title}
                         </a>
                         <button
                           onClick={() => deleteLink(l.id)}
-                          className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs flex-shrink-0 transition"
+                          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs flex-shrink-0 transition"
                         >
                           ×
                         </button>
                       </div>
                     ))}
                     {links.length === 0 && !addingLink && (
-                      <p className="text-xs text-gray-400">No links yet</p>
+                      <p className="text-xs opacity-40">No links yet</p>
                     )}
                   </div>
                 </div>

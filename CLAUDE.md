@@ -50,7 +50,7 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **Two views**: "Week" (current calendar week, Mon–Sun, with prev/next arrows) and "All" (last 50 sessions, newest first). Toggle via button in header.
 - **Session structure**: header (workout type + date + optional duration), collapsible exercise list below.
 - **Exercises**: name, sets, reps, weight (kg). Added inline via "+ Add exercise" when a session is expanded.
-- **Color picker**: ⚙ gear icon in header opens a swatch panel; selected color stored in `localStorage` under key `gym_widget_color`. Default is `bg-blue-600`.
+- **Accent colour picker**: ⚙ gear icon in header opens a swatch panel; selected border accent stored in `localStorage` under key `gym_widget_border`. Default is `border-l-blue-400`. The picker sets the left border accent colour only — the widget background is always white/dark-gray like all other widgets.
 - **`load` as `useCallback`**: depends on `viewAll` and `weekOffset`; the `useEffect` depends on `load`, so changing either view state automatically triggers a re-fetch. Mutations call `load()` directly after await.
 - **Week navigation**: forward arrow disabled at `weekOffset >= 0` to prevent navigating to future weeks.
 
@@ -113,7 +113,20 @@ Calendar API error messages include the HTTP status and Google's response body (
 
 ### Styling
 
-Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`). Each widget has a solid colored background (`bg-{color}-{shade}`) with `text-white` and uses `bg-white/10`, `bg-white/20` for internal card surfaces. No dark mode toggle — the page background is hardcoded `bg-gray-950`.
+Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
+
+**Design system (light minimal, as of 2026-06-22):**
+- Widget outer: `bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded shadow-sm` + `border-l-2 border-l-{accent}` per widget area
+- Inner cards/panels: `bg-gray-50 dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-700`
+- Inputs: `bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded placeholder-gray-400`
+- Primary buttons: `bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded`
+- Section labels: `text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500`
+- Color use: **semantic only** — red = danger/over-budget, green = done, yellow = warning. No decorative color.
+- Left border accent (2px) per widget area identifies each widget type. Accents: emerald=NetWorth, teal=Accounts, amber=Income/Cookbook, blue=Gym/Nutrition, violet=Habits/Curriculars, slate=Notes, rose=Todo.
+
+**Background**: `BackgroundTheme.tsx` shifts the body background from near-black at night to near-white during the day (Melbourne sunrise/sunset). It also adds/removes the `dark` class on `<html>`, so all `dark:` Tailwind variants respond automatically.
+
+**UI history**: Previous designs are saved in `ui-snapshots/`. The original colorful bubble design is at `ui-snapshots/2026-06-22-colorful-bubbles/` with a README explaining how to restore it.
 
 ### Database schema
 

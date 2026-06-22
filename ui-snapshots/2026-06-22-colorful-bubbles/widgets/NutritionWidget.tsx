@@ -113,23 +113,23 @@ export default function NutritionWidget() {
   ]
 
   return (
-    <div className="rounded p-5 flex flex-col gap-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-blue-400 shadow-sm text-gray-900 dark:text-gray-100">
+    <div className="rounded-2xl p-5 flex flex-col gap-4 bg-green-600 text-white">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Nutrition</p>
+          <p className="text-sm font-semibold uppercase tracking-wider opacity-80">Nutrition</p>
           <div className="flex items-center gap-0.5 mt-0.5">
             <button
               onClick={() => setDateOffset(o => o - 1)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm w-5 text-center leading-none transition"
+              className="opacity-60 hover:opacity-100 text-sm w-5 text-center leading-none"
             >
               ‹
             </button>
-            <p className="text-xs text-gray-400 dark:text-gray-500">{dateLabel(dateOffset)}</p>
+            <p className="text-xs opacity-60">{dateLabel(dateOffset)}</p>
             <button
               onClick={() => setDateOffset(o => o + 1)}
               disabled={dateOffset >= 0}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20 disabled:cursor-not-allowed text-sm w-5 text-center leading-none transition"
+              className="opacity-60 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed text-sm w-5 text-center leading-none"
             >
               ›
             </button>
@@ -146,13 +146,13 @@ export default function NutritionWidget() {
               })
               setEditingTargets(t => !t)
             }}
-            className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+            className="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full transition"
           >
             Targets
           </button>
           <button
             onClick={() => setAdding(!adding)}
-            className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+            className="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full transition"
           >
             + Meal
           </button>
@@ -161,16 +161,16 @@ export default function NutritionWidget() {
 
       {/* Targets edit form */}
       {editingTargets && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 border border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-400 dark:text-gray-500">Daily targets</p>
+        <div className="bg-white/10 rounded-xl p-3 space-y-2">
+          <p className="text-xs opacity-70">Daily targets</p>
           <div className="grid grid-cols-4 gap-1.5">
             {macros.map(({ key, label }) => (
               <div key={key} className="flex flex-col gap-1">
-                <p className="text-[10px] text-gray-400 text-center">{label}</p>
+                <p className="text-[10px] opacity-60 text-center">{label}</p>
                 <input
                   type="number"
                   min="0"
-                  className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm text-center placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                  className="bg-white/20 rounded-lg px-2 py-1.5 text-sm text-center placeholder-white/50 outline-none"
                   value={targetForm[key] ?? ''}
                   onChange={e => setTargetForm(f => ({ ...f, [key]: e.target.value }))}
                 />
@@ -180,13 +180,13 @@ export default function NutritionWidget() {
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setEditingTargets(false)}
-              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2"
+              className="text-xs opacity-60 hover:opacity-100 transition px-2"
             >
               Cancel
             </button>
             <button
               onClick={saveTargets}
-              className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm px-4 py-1.5 rounded transition"
+              className="bg-white text-green-600 font-semibold text-sm px-4 py-1.5 rounded-lg"
             >
               Save
             </button>
@@ -202,17 +202,17 @@ export default function NutritionWidget() {
           const pct = Math.min(100, target > 0 ? (value / target) * 100 : 0)
           const over = value > target
           return (
-            <div key={label} className="bg-gray-50 dark:bg-gray-800 rounded p-2.5 text-center border border-gray-100 dark:border-gray-700">
-              <p className="text-xs text-gray-400 dark:text-gray-500">{label}</p>
+            <div key={label} className="bg-white/10 rounded-xl p-2.5 text-center">
+              <p className="text-xs opacity-70">{label}</p>
               <p className="font-bold text-sm mt-0.5">{value}</p>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500">{unit}</p>
-              <div className="mt-1.5 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <p className="text-[10px] opacity-50">{unit}</p>
+              <div className="mt-1.5 h-1 bg-white/20 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${over ? 'bg-red-400' : 'bg-gray-500 dark:bg-gray-400'}`}
+                  className={`h-full rounded-full transition-all ${over ? 'bg-red-300' : 'bg-white/70'}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <p className="text-[9px] text-gray-400 mt-0.5">/ {target}</p>
+              <p className="text-[9px] opacity-40 mt-0.5">/ {target}</p>
             </div>
           )
         })}
@@ -220,10 +220,10 @@ export default function NutritionWidget() {
 
       {/* Add meal form */}
       {adding && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white/10 rounded-xl p-3 space-y-2">
           <input
             autoFocus
-            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+            className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
             placeholder="Meal name (e.g. Oats with banana)"
             value={form.meal_name}
             onChange={e => setForm(f => ({ ...f, meal_name: e.target.value }))}
@@ -235,7 +235,7 @@ export default function NutritionWidget() {
                 key={field}
                 type="number"
                 min="0"
-                className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm text-center placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                className="bg-white/20 rounded-lg px-2 py-1.5 text-sm text-center placeholder-white/50 outline-none"
                 placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
                 value={form[field]}
                 onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -245,13 +245,13 @@ export default function NutritionWidget() {
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => { setAdding(false); setForm(EMPTY_FORM) }}
-              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2"
+              className="text-xs opacity-60 hover:opacity-100 transition px-2"
             >
               Cancel
             </button>
             <button
               onClick={addLog}
-              className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm px-4 py-1.5 rounded transition"
+              className="bg-white text-green-600 font-semibold text-sm px-4 py-1.5 rounded-lg"
             >
               Save
             </button>
@@ -262,23 +262,23 @@ export default function NutritionWidget() {
       {/* Meal list */}
       {loading ? (
         <div className="space-y-2">
-          {[1, 2].map(i => <div key={i} className="animate-pulse h-10 bg-gray-200 dark:bg-gray-700 rounded" />)}
+          {[1, 2].map(i => <div key={i} className="animate-pulse h-10 bg-white/20 rounded-lg" />)}
         </div>
       ) : logs.length === 0 ? (
-        <p className="text-sm text-gray-400">No meals logged {dateOffset === 0 ? 'today' : 'this day'}.</p>
+        <p className="text-sm opacity-60">No meals logged {dateOffset === 0 ? 'today' : 'this day'}.</p>
       ) : (
         <div className="space-y-1.5">
           {logs.map(log => (
-            <div key={log.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded px-3 py-2 group border border-gray-100 dark:border-gray-700">
+            <div key={log.id} className="flex items-center justify-between bg-white/10 rounded-xl px-3 py-2 group">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{log.meal_name}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
+                <p className="text-xs opacity-60">
                   {log.calories} kcal · {log.protein}g P · {log.carbs}g C · {log.fat}g F
                 </p>
               </div>
               <button
                 onClick={() => deleteLog(log.id)}
-                className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-sm ml-2 transition"
+                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-sm ml-2 transition"
               >
                 ×
               </button>

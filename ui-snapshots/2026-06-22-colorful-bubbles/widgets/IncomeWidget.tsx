@@ -64,76 +64,76 @@ export default function IncomeWidget() {
   const total = streams.reduce((s, i) => s + i.amount, 0)
 
   return (
-    <div className="rounded p-5 flex flex-col gap-3 h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-amber-400 shadow-sm text-gray-900 dark:text-gray-100">
+    <div className="rounded-2xl p-5 flex flex-col gap-3 h-full bg-amber-500 text-white">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Income</p>
-          <p className="text-2xl font-bold">{formatCurrency(total)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500">/mo</span></p>
+          <p className="text-sm font-semibold uppercase tracking-wider opacity-80">Income</p>
+          <p className="text-2xl font-bold">{formatCurrency(total)}<span className="text-sm font-normal opacity-70">/mo</span></p>
         </div>
         <button
           onClick={() => setAdding(!adding)}
-          className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+          className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition"
         >
           + Add
         </button>
       </div>
 
       {adding && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white/10 rounded-xl p-3 space-y-2">
           <input
-            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+            className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
             placeholder="Source name"
             value={newStream.name}
             onChange={(e) => setNewStream({ ...newStream, name: e.target.value })}
           />
           <div className="flex gap-2">
             <select
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+              className="flex-1 bg-white/20 rounded-lg px-2 py-1.5 text-sm outline-none"
               value={newStream.category}
               onChange={(e) => setNewStream({ ...newStream, category: e.target.value as IncomeCategory })}
             >
               {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
-                <option key={k} value={k}>{v.emoji} {v.label}</option>
+                <option key={k} value={k} className="text-black">{v.emoji} {v.label}</option>
               ))}
             </select>
             <select
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+              className="flex-1 bg-white/20 rounded-lg px-2 py-1.5 text-sm outline-none"
               value={newStream.destination}
               onChange={(e) => setNewStream({ ...newStream, destination: e.target.value as AccountGroup })}
             >
-              {Object.entries(GROUP_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {Object.entries(GROUP_LABELS).map(([k, v]) => <option key={k} value={k} className="text-black">{v}</option>)}
             </select>
           </div>
           <div className="flex gap-2">
             <input
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+              className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
               placeholder="Monthly amount"
               type="number"
               value={newStream.amount}
               onChange={(e) => setNewStream({ ...newStream, amount: e.target.value })}
             />
-            <button onClick={addStream} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm px-3 py-1.5 rounded transition">Save</button>
+            <button onClick={addStream} className="bg-white text-amber-600 font-semibold text-sm px-3 py-1.5 rounded-lg">Save</button>
           </div>
         </div>
       )}
 
       {loading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="animate-pulse h-8 bg-gray-200 dark:bg-gray-700 rounded" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="animate-pulse h-8 bg-white/20 rounded-lg" />)}
         </div>
       ) : streams.length === 0 ? (
-        <p className="text-sm text-gray-400">No income streams yet.</p>
+        <p className="text-sm opacity-60">No income streams yet.</p>
       ) : (
         <div className="space-y-1.5 overflow-y-auto flex-1">
           {streams.map((stream) => {
             const config = CATEGORY_CONFIG[stream.category]
             return (
-              <div key={stream.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded px-3 py-2 group border border-gray-100 dark:border-gray-700">
+              <div key={stream.id} className="flex items-center justify-between bg-white/10 rounded-xl px-3 py-2 group">
                 <div className="flex items-center gap-2">
                   <span className="text-base">{config.emoji}</span>
                   <div>
                     <p className="text-sm font-medium leading-tight">{stream.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">→ {GROUP_LABELS[stream.destination as AccountGroup]}</p>
+                    <p className="text-xs opacity-60">→ {GROUP_LABELS[stream.destination as AccountGroup]}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -141,12 +141,12 @@ export default function IncomeWidget() {
                     <div className="flex gap-1">
                       <input
                         autoFocus
-                        className="w-24 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-right outline-none text-gray-900 dark:text-gray-100"
+                        className="w-24 bg-white/20 rounded-lg px-2 py-1 text-sm text-right outline-none"
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(stream.id); if (e.key === 'Escape') setEditing(null) }}
                       />
-                      <button onClick={() => saveEdit(stream.id)} className="text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold px-2 py-1 rounded">✓</button>
+                      <button onClick={() => saveEdit(stream.id)} className="text-xs bg-white text-amber-600 font-bold px-2 py-1 rounded-lg">✓</button>
                     </div>
                   ) : (
                     <>
@@ -158,7 +158,7 @@ export default function IncomeWidget() {
                       </button>
                       <button
                         onClick={() => deleteStream(stream.id)}
-                        className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition"
+                        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition"
                       >
                         ×
                       </button>

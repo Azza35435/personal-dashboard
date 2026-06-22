@@ -5,15 +5,15 @@ import { supabase } from '@/lib/supabase'
 import type { GymSession, GymExercise } from '@/lib/types'
 
 const COLOR_OPTIONS = [
-  { label: 'Blue', border: 'border-l-blue-400', swatch: 'bg-blue-400' },
-  { label: 'Violet', border: 'border-l-violet-400', swatch: 'bg-violet-400' },
-  { label: 'Rose', border: 'border-l-rose-400', swatch: 'bg-rose-400' },
-  { label: 'Orange', border: 'border-l-orange-400', swatch: 'bg-orange-400' },
-  { label: 'Emerald', border: 'border-l-emerald-400', swatch: 'bg-emerald-400' },
-  { label: 'Slate', border: 'border-l-slate-400', swatch: 'bg-slate-400' },
+  { label: 'Blue', bg: 'bg-blue-600' },
+  { label: 'Violet', bg: 'bg-violet-600' },
+  { label: 'Rose', bg: 'bg-rose-600' },
+  { label: 'Orange', bg: 'bg-orange-500' },
+  { label: 'Emerald', bg: 'bg-emerald-600' },
+  { label: 'Slate', bg: 'bg-slate-700' },
 ]
-const DEFAULT_COLOR = 'border-l-blue-400'
-const COLOR_STORAGE_KEY = 'gym_widget_border'
+const DEFAULT_COLOR = 'bg-blue-600'
+const COLOR_STORAGE_KEY = 'gym_widget_color'
 
 function getWeekRange(offset: number) {
   const now = new Date()
@@ -48,12 +48,12 @@ export default function GymWidget() {
   const [sessionForm, setSessionForm] = useState(emptySessionForm)
   const [addingExerciseTo, setAddingExerciseTo] = useState<string | null>(null)
   const [exerciseForm, setExerciseForm] = useState(EMPTY_EXERCISE)
-  const [widgetBorder, setWidgetBorder] = useState(DEFAULT_COLOR)
+  const [widgetColor, setWidgetColor] = useState(DEFAULT_COLOR)
   const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem(COLOR_STORAGE_KEY)
-    if (stored) setWidgetBorder(stored)
+    if (stored) setWidgetColor(stored)
   }, [])
 
   const load = useCallback(async () => {
@@ -92,9 +92,9 @@ export default function GymWidget() {
 
   useEffect(() => { load() }, [load])
 
-  const changeColor = (border: string) => {
-    setWidgetBorder(border)
-    localStorage.setItem(COLOR_STORAGE_KEY, border)
+  const changeColor = (bg: string) => {
+    setWidgetColor(bg)
+    localStorage.setItem(COLOR_STORAGE_KEY, bg)
   }
 
   const addSession = async () => {
@@ -148,49 +148,49 @@ export default function GymWidget() {
   const weekLabel = `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${sunday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
 
   return (
-    <div className={`rounded p-5 flex flex-col gap-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 ${widgetBorder} shadow-sm text-gray-900 dark:text-gray-100`}>
+    <div className={`rounded-2xl p-5 flex flex-col gap-4 ${widgetColor} text-white`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Gym</p>
+          <p className="text-sm font-semibold uppercase tracking-wider opacity-80">Gym</p>
           {!viewAll ? (
             <div className="flex items-center gap-0.5 mt-0.5">
               <button
                 onClick={() => setWeekOffset(o => o - 1)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm w-5 text-center leading-none transition"
+                className="opacity-60 hover:opacity-100 text-sm w-5 text-center leading-none"
               >
                 ‹
               </button>
-              <p className="text-xs text-gray-400 dark:text-gray-500">{weekLabel}</p>
+              <p className="text-xs opacity-60">{weekLabel}</p>
               <button
                 onClick={() => setWeekOffset(o => o + 1)}
                 disabled={weekOffset >= 0}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20 disabled:cursor-not-allowed text-sm w-5 text-center leading-none transition"
+                className="opacity-60 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed text-sm w-5 text-center leading-none"
               >
                 ›
               </button>
             </div>
           ) : (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">All sessions</p>
+            <p className="text-xs opacity-60 mt-0.5">All sessions</p>
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => { setViewAll(v => !v); setWeekOffset(0) }}
-            className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+            className="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full transition"
           >
             {viewAll ? 'Week' : 'All'}
           </button>
           <button
             onClick={() => { setAddingSession(s => !s) }}
-            className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+            className="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full transition"
           >
             + Session
           </button>
           <button
             onClick={() => setShowSettings(s => !s)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition text-base w-6 text-center"
-            title="Accent colour"
+            className="opacity-60 hover:opacity-100 transition text-base w-6 text-center"
+            title="Widget settings"
           >
             ⚙
           </button>
@@ -199,15 +199,15 @@ export default function GymWidget() {
 
       {/* Color picker */}
       {showSettings && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Accent colour</p>
+        <div className="bg-white/10 rounded-xl p-3">
+          <p className="text-xs opacity-70 mb-2">Widget colour</p>
           <div className="flex gap-2 flex-wrap">
             {COLOR_OPTIONS.map(opt => (
               <button
-                key={opt.border}
+                key={opt.bg}
                 title={opt.label}
-                onClick={() => changeColor(opt.border)}
-                className={`w-5 h-5 rounded-full border-2 transition ${opt.swatch} ${widgetBorder === opt.border ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                onClick={() => changeColor(opt.bg)}
+                className={`w-6 h-6 rounded-full border-2 transition ${opt.bg} ${widgetColor === opt.bg ? 'border-white scale-110' : 'border-transparent opacity-70 hover:opacity-100'}`}
               />
             ))}
           </div>
@@ -216,17 +216,17 @@ export default function GymWidget() {
 
       {/* Add session form */}
       {addingSession && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white/10 rounded-xl p-3 space-y-2">
           <div className="grid grid-cols-3 gap-1.5">
             <input
               type="date"
-              className="col-span-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+              className="col-span-1 bg-white/20 rounded-lg px-2 py-1.5 text-sm outline-none"
               value={sessionForm.date}
               onChange={e => setSessionForm(f => ({ ...f, date: e.target.value }))}
             />
             <input
               autoFocus
-              className="col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+              className="col-span-2 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
               placeholder="Workout type (e.g. Push, Legs)"
               value={sessionForm.workout_type}
               onChange={e => setSessionForm(f => ({ ...f, workout_type: e.target.value }))}
@@ -236,7 +236,7 @@ export default function GymWidget() {
           <input
             type="number"
             min="1"
-            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+            className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
             placeholder="Duration in minutes (optional)"
             value={sessionForm.duration_minutes}
             onChange={e => setSessionForm(f => ({ ...f, duration_minutes: e.target.value }))}
@@ -245,13 +245,13 @@ export default function GymWidget() {
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => { setAddingSession(false); setSessionForm(emptySessionForm()) }}
-              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2"
+              className="text-xs opacity-60 hover:opacity-100 transition px-2"
             >
               Cancel
             </button>
             <button
               onClick={addSession}
-              className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm px-4 py-1.5 rounded transition"
+              className="bg-white/90 text-gray-800 font-semibold text-sm px-4 py-1.5 rounded-lg"
             >
               Save
             </button>
@@ -262,10 +262,10 @@ export default function GymWidget() {
       {/* Sessions list */}
       {loading ? (
         <div className="space-y-2">
-          {[1, 2].map(i => <div key={i} className="animate-pulse h-12 bg-gray-200 dark:bg-gray-700 rounded" />)}
+          {[1, 2].map(i => <div key={i} className="animate-pulse h-12 bg-white/20 rounded-xl" />)}
         </div>
       ) : sessions.length === 0 ? (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm opacity-60">
           {viewAll ? 'No sessions logged yet.' : 'No sessions this week.'}
         </p>
       ) : (
@@ -274,14 +274,14 @@ export default function GymWidget() {
             const exs = exercises[session.id] ?? []
             const isExpanded = expanded.has(session.id)
             return (
-              <div key={session.id} className="bg-gray-50 dark:bg-gray-800 rounded overflow-hidden group border border-gray-100 dark:border-gray-700">
+              <div key={session.id} className="bg-white/10 rounded-xl overflow-hidden group">
                 <div
                   className="flex items-center justify-between px-3 py-2.5 cursor-pointer select-none"
                   onClick={() => toggleExpand(session.id)}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{session.workout_type}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                    <p className="text-xs opacity-60">
                       {fmtDate(session.date)}
                       {session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}
                       {exs.length > 0 ? ` · ${exs.length} exercise${exs.length !== 1 ? 's' : ''}` : ''}
@@ -291,20 +291,20 @@ export default function GymWidget() {
                     <button
                       onPointerDown={e => e.stopPropagation()}
                       onClick={e => { e.stopPropagation(); deleteSession(session.id) }}
-                      className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none transition"
+                      className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-base leading-none transition"
                     >
                       ×
                     </button>
-                    <span className="text-xs text-gray-400">{isExpanded ? '▴' : '▾'}</span>
+                    <span className="text-xs opacity-50">{isExpanded ? '▴' : '▾'}</span>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="px-3 pb-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <div className="px-3 pb-3 space-y-1.5 border-t border-white/10 pt-2">
                     {exs.map(ex => (
-                      <div key={ex.id} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded px-2.5 py-1.5 group/ex border border-gray-100 dark:border-gray-700">
+                      <div key={ex.id} className="flex items-center justify-between bg-white/10 rounded-lg px-2.5 py-1.5 group/ex">
                         <p className="text-sm flex-1 truncate">{ex.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
+                        <p className="text-xs opacity-60 ml-2 shrink-0">
                           {[
                             ex.sets != null && ex.reps != null ? `${ex.sets}×${ex.reps}` : null,
                             ex.weight_kg != null ? `${ex.weight_kg}kg` : null,
@@ -312,7 +312,7 @@ export default function GymWidget() {
                         </p>
                         <button
                           onClick={() => deleteExercise(ex.id)}
-                          className="opacity-0 group-hover/ex:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none ml-2 transition"
+                          className="opacity-0 group-hover/ex:opacity-50 hover:!opacity-100 text-base leading-none ml-2 transition"
                         >
                           ×
                         </button>
@@ -323,7 +323,7 @@ export default function GymWidget() {
                       <div className="space-y-1.5 mt-1">
                         <input
                           autoFocus
-                          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                          className="w-full bg-white/20 rounded-lg px-2.5 py-1.5 text-sm placeholder-white/50 outline-none"
                           placeholder="Exercise name"
                           value={exerciseForm.name}
                           onChange={e => setExerciseForm(f => ({ ...f, name: e.target.value }))}
@@ -339,7 +339,7 @@ export default function GymWidget() {
                               type="number"
                               min="0"
                               step={field === 'weight_kg' ? '0.5' : '1'}
-                              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm text-center placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                              className="bg-white/20 rounded-lg px-2 py-1.5 text-sm text-center placeholder-white/50 outline-none"
                               placeholder={placeholder}
                               value={exerciseForm[field]}
                               onChange={e => setExerciseForm(f => ({ ...f, [field]: e.target.value }))}
@@ -350,13 +350,13 @@ export default function GymWidget() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => { setAddingExerciseTo(null); setExerciseForm(EMPTY_EXERCISE) }}
-                            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2"
+                            className="text-xs opacity-60 hover:opacity-100 transition px-2"
                           >
                             Cancel
                           </button>
                           <button
                             onClick={() => addExercise(session.id)}
-                            className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1.5 rounded transition"
+                            className="bg-white/90 text-gray-800 font-semibold text-xs px-3 py-1.5 rounded-lg"
                           >
                             Add
                           </button>
@@ -365,7 +365,7 @@ export default function GymWidget() {
                     ) : (
                       <button
                         onClick={() => { setAddingExerciseTo(session.id); setExerciseForm(EMPTY_EXERCISE) }}
-                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition mt-0.5"
+                        className="text-xs opacity-60 hover:opacity-100 transition mt-0.5"
                       >
                         + Add exercise
                       </button>

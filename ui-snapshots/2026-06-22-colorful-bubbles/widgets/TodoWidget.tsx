@@ -342,8 +342,8 @@ export default function TodoWidget() {
       : null
     const c = sectionColor ?? firstSectionColor
     return c
-      ? { backgroundColor: toRgba(c, 0.1), border: `1px solid ${toRgba(c, 0.3)}` }
-      : {}
+      ? { backgroundColor: toRgba(c, 0.3), border: `1px solid ${toRgba(c, 0.5)}` }
+      : { backgroundColor: 'rgba(255,255,255,0.1)' }
   }
 
   const toggleSectionPick = (id: string) =>
@@ -381,9 +381,8 @@ export default function TodoWidget() {
           })
         } : undefined}
         className={[
-          'flex items-start gap-2.5 rounded px-3 py-2 group select-none',
+          'flex items-start gap-2.5 rounded-xl px-3 py-2 group select-none',
           'transition-opacity duration-150',
-          'bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700',
           isDragSource ? 'opacity-30 pointer-events-none' : '',
           canDrag && !dragging ? 'cursor-grab' : '',
         ].join(' ')}
@@ -392,19 +391,16 @@ export default function TodoWidget() {
         <button
           onClick={() => toggle(todo)}
           onPointerDown={e => e.stopPropagation()}
-          className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition ${
-            todo.completed
-              ? 'border-gray-400 bg-gray-200 dark:bg-gray-600 dark:border-gray-500'
-              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-          }`}
+          className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-white/50 flex items-center justify-center transition
+            ${todo.completed ? 'bg-white/60' : 'hover:bg-white/20'}`}
         >
-          {todo.completed && <span className="text-gray-500 dark:text-gray-400 text-xs font-bold">✓</span>}
+          {todo.completed && <span className="text-rose-500 text-xs font-bold">✓</span>}
         </button>
         <div className="flex-1 min-w-0">
           {editingTodo === todo.id ? (
             <input
               autoFocus
-              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-sm outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+              className="w-full bg-white/20 rounded px-1.5 py-0.5 text-sm outline-none"
               value={editingTodoTitle}
               onChange={e => setEditingTodoTitle(e.target.value)}
               onBlur={() => updateTodoTitle(todo.id, editingTodoTitle)}
@@ -415,7 +411,7 @@ export default function TodoWidget() {
             />
           ) : (
             <p
-              className={`text-sm leading-tight ${todo.completed ? 'line-through text-gray-400 dark:text-gray-500' : ''} cursor-text`}
+              className={`text-sm leading-tight ${todo.completed ? 'line-through' : ''} cursor-text`}
               onDoubleClick={() => { setEditingTodo(todo.id); setEditingTodoTitle(todo.title) }}
             >
               {todo.title}
@@ -428,10 +424,10 @@ export default function TodoWidget() {
               return (
                 <span
                   key={ts.section_id}
-                  className="text-xs px-1.5 py-0.5 rounded leading-none"
+                  className="text-xs px-1.5 py-0.5 rounded-full leading-none"
                   style={sec.color
-                    ? { backgroundColor: toRgba(sec.color, 0.15), border: `1px solid ${toRgba(sec.color, 0.35)}` }
-                    : { backgroundColor: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)' }
+                    ? { backgroundColor: toRgba(sec.color, 0.35), border: `1px solid ${toRgba(sec.color, 0.6)}` }
+                    : { backgroundColor: 'rgba(255,255,255,0.2)' }
                   }
                 >
                   {sec.name}
@@ -439,7 +435,7 @@ export default function TodoWidget() {
               )
             })}
             {todo.due_date && (
-              <span className={`text-xs ${!todo.completed && isPast(todo.due_date) ? 'text-red-500 font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
+              <span className={`text-xs ${!todo.completed && isPast(todo.due_date) ? 'text-red-200 font-semibold' : 'opacity-60'}`}>
                 {formatDate(todo.due_date)}
               </span>
             )}
@@ -450,7 +446,7 @@ export default function TodoWidget() {
           <button
             onClick={(e) => openEdit(e, todo)}
             onPointerDown={e => e.stopPropagation()}
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm leading-none transition px-0.5"
+            className="text-white/50 hover:text-white/90 text-sm leading-none transition px-0.5"
             title="Edit task"
           >
             ···
@@ -458,7 +454,7 @@ export default function TodoWidget() {
           <button
             onClick={() => remove(todo.id)}
             onPointerDown={e => e.stopPropagation()}
-            className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition"
+            className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs transition"
           >
             ×
           </button>
@@ -544,7 +540,7 @@ export default function TodoWidget() {
               <button
                 onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}
                 onPointerDown={e => e.stopPropagation()}
-                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 w-3 text-left leading-none transition"
+                className="text-xs opacity-50 hover:opacity-100 w-3 text-left leading-none"
               >
                 {isCollapsed ? '▶' : '▼'}
               </button>
@@ -564,7 +560,7 @@ export default function TodoWidget() {
               {editingSection === sec.id ? (
                 <input
                   autoFocus
-                  className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-semibold outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                  className="flex-1 bg-white/20 rounded px-2 py-0.5 text-sm font-semibold outline-none"
                   value={editingSectionName}
                   onChange={e => setEditingSectionName(e.target.value)}
                   onBlur={() => renameSection(sec.id)}
@@ -576,31 +572,34 @@ export default function TodoWidget() {
                 />
               ) : (
                 <span
-                  className="text-sm font-semibold hover:opacity-70 transition"
+                  className="text-sm font-semibold hover:opacity-80 transition"
                   onDoubleClick={() => { setEditingSection(sec.id); setEditingSectionName(sec.name) }}
                 >
                   {sec.name}
                 </span>
               )}
-              <span className="text-xs text-gray-400 dark:text-gray-500">{items.length}</span>
+              <span className="text-xs opacity-40">{items.length}</span>
               <button
                 onClick={() => deleteSection(sec.id)}
                 onPointerDown={e => e.stopPropagation()}
-                className="ml-auto opacity-0 group-hover/sec:opacity-40 hover:!opacity-80 text-gray-500 text-sm transition"
+                className="ml-auto opacity-0 group-hover/sec:opacity-40 hover:!opacity-100 text-sm transition"
               >
                 ×
               </button>
             </div>
             {!isCollapsed && (
               <div
-                className="flex flex-col gap-1.5 rounded p-2 min-h-[2.5rem] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
+                className="flex flex-col gap-1.5 rounded-xl p-2 min-h-[2.5rem]"
                 style={sec.color ? {
-                  backgroundColor: toRgba(sec.color, 0.05),
-                  border: `1px solid ${toRgba(sec.color, 0.2)}`,
-                } : {}}
+                  backgroundColor: toRgba(sec.color, 0.08),
+                  border: `1px solid ${toRgba(sec.color, 0.25)}`,
+                } : {
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
               >
                 {items.length === 0 && !dragging
-                  ? <p className="text-xs text-gray-400 dark:text-gray-500 px-1">No tasks</p>
+                  ? <p className="text-xs opacity-40 px-1">No tasks</p>
                   : renderGroup(items, sec.id, sec.id)}
               </div>
             )}
@@ -617,12 +616,12 @@ export default function TodoWidget() {
           <div className="flex items-center gap-2 mb-1.5">
             <button
               onClick={() => setCollapsed(p => ({ ...p, __none__: !p.__none__ }))}
-              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 w-3 text-left leading-none transition"
+              className="text-xs opacity-40 hover:opacity-80 w-3 text-left leading-none"
             >
               {collapsed.__none__ ? '▶' : '▼'}
             </button>
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">No Section</span>
-            <span className="text-xs text-gray-400 dark:text-gray-500">{noSectionItems.length}</span>
+            <span className="text-xs font-semibold uppercase tracking-wider opacity-40">No Section</span>
+            <span className="text-xs opacity-30">{noSectionItems.length}</span>
           </div>
           {!collapsed.__none__ && (
             <div className="flex flex-col gap-1.5">
@@ -652,7 +651,7 @@ export default function TodoWidget() {
             </label>
             <input
               autoFocus
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+              className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
               placeholder="Section name — press Enter to save"
               value={newSectionName}
               onChange={e => setNewSectionName(e.target.value)}
@@ -665,7 +664,7 @@ export default function TodoWidget() {
         ) : (
           <button
             onClick={() => setAddingSection(true)}
-            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+            className="text-xs opacity-50 hover:opacity-100 transition"
           >
             + Add section
           </button>
@@ -680,20 +679,19 @@ export default function TodoWidget() {
   const draggingTodo = dragging ? todos.find(t => t.id === dragging.todoId) ?? null : null
 
   return (
-    <div className="rounded p-5 flex flex-col gap-3 h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-rose-400 shadow-sm text-gray-900 dark:text-gray-100">
+    <div className="rounded-2xl p-5 flex flex-col gap-3 h-full bg-rose-500 text-white">
 
       {/* Floating section header during section drag */}
       {sectionDrag && (
         <div
           data-drag-float="true"
-          className="fixed z-50 pointer-events-none rounded px-3 py-2 flex items-center gap-2 shadow-2xl ring-1 ring-gray-200 dark:ring-gray-700 select-none bg-white dark:bg-gray-800"
+          className="fixed z-50 pointer-events-none rounded-xl px-3 py-2 flex items-center gap-2 shadow-2xl ring-1 ring-white/20 select-none"
           style={{
             left: sectionDrag.x - sectionDrag.offsetX,
             top: sectionDrag.y - sectionDrag.offsetY,
             width: sectionDrag.width,
-            ...(sectionDrag.sectionColor
-              ? { backgroundColor: toRgba(sectionDrag.sectionColor, 0.15), border: `1px solid ${toRgba(sectionDrag.sectionColor, 0.4)}` }
-              : {}),
+            backgroundColor: sectionDrag.sectionColor ? toRgba(sectionDrag.sectionColor, 0.4) : 'rgba(255,255,255,0.15)',
+            border: sectionDrag.sectionColor ? `1px solid ${toRgba(sectionDrag.sectionColor, 0.6)}` : '1px solid rgba(255,255,255,0.2)',
           }}
         >
           {sectionDrag.sectionColor && (
@@ -708,10 +706,12 @@ export default function TodoWidget() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setEditingCard(null)} />
           <div
-            className="fixed z-50 w-56 rounded p-3 flex flex-col gap-2.5 shadow-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+            className="fixed z-50 w-56 rounded-2xl p-3 flex flex-col gap-2.5 shadow-2xl"
             style={{
               right: window.innerWidth - editingCard.anchorRight,
               top: editingCard.anchorBottom + 6,
+              backgroundColor: '#9f1239',
+              border: '1px solid rgba(255,255,255,0.15)',
             }}
             onPointerDown={e => e.stopPropagation()}
             onClick={e => e.stopPropagation()}
@@ -719,7 +719,7 @@ export default function TodoWidget() {
             {/* Title */}
             <input
               autoFocus
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-gray-400 transition"
+              className="w-full bg-white/15 rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/40 outline-none"
               placeholder="Task title"
               value={editingCard.title}
               onChange={e => setEditingCard(p => p ? { ...p, title: e.target.value } : p)}
@@ -732,11 +732,8 @@ export default function TodoWidget() {
                 <button
                   key={p}
                   onClick={() => setEditingCard(prev => prev ? { ...prev, priority: p } : prev)}
-                  className={`flex-1 text-xs py-1 rounded capitalize transition font-medium border ${
-                    editingCard.priority === p
-                      ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
-                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
+                  className={`flex-1 text-xs py-1 rounded-lg capitalize transition font-medium
+                    ${editingCard.priority === p ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'}`}
                 >
                   {p}
                 </button>
@@ -746,7 +743,7 @@ export default function TodoWidget() {
             {/* Due date */}
             <input
               type="date"
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-gray-400 transition"
+              className="w-full bg-white/15 rounded-lg px-3 py-1.5 text-sm text-white outline-none"
               value={editingCard.dueDate}
               onChange={e => setEditingCard(p => p ? { ...p, dueDate: e.target.value } : p)}
             />
@@ -766,12 +763,12 @@ export default function TodoWidget() {
                           : [...prev.sectionIds, s.id]
                         return { ...prev, sectionIds: ids }
                       })}
-                      className="text-xs px-2 py-0.5 rounded transition border"
+                      className="text-xs px-2 py-0.5 rounded-full transition border"
                       style={active && s.color
-                        ? { backgroundColor: toRgba(s.color, 0.2), borderColor: toRgba(s.color, 0.5), fontWeight: 600 }
+                        ? { backgroundColor: toRgba(s.color, 0.4), borderColor: toRgba(s.color, 0.7), fontWeight: 600 }
                         : active
-                          ? { backgroundColor: 'rgba(0,0,0,0.08)', borderColor: 'rgba(0,0,0,0.2)', fontWeight: 600 }
-                          : { borderColor: 'rgba(0,0,0,0.12)' }}
+                          ? { backgroundColor: 'rgba(255,255,255,0.25)', borderColor: 'rgba(255,255,255,0.4)', fontWeight: 600 }
+                          : { borderColor: 'rgba(255,255,255,0.2)' }}
                     >
                       {s.name}
                     </button>
@@ -783,7 +780,7 @@ export default function TodoWidget() {
             {/* Save */}
             <button
               onClick={saveEdit}
-              className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1.5 rounded hover:opacity-90 transition"
+              className="w-full bg-white text-rose-700 font-semibold text-sm py-1.5 rounded-lg hover:bg-white/90 transition"
             >
               Save
             </button>
@@ -795,7 +792,7 @@ export default function TodoWidget() {
       {dragging && draggingTodo && (
         <div
           data-drag-float="true"
-          className="fixed z-50 pointer-events-none rounded px-3 py-2 flex items-start gap-2.5 shadow-2xl ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-gray-800"
+          className="fixed z-50 pointer-events-none rounded-xl px-3 py-2 flex items-start gap-2.5 shadow-2xl ring-1 ring-white/20"
           style={{
             left: dragging.x - dragging.offsetX,
             top: dragging.y - dragging.offsetY,
@@ -803,7 +800,7 @@ export default function TodoWidget() {
             ...resolveCardStyle(draggingTodo, view === 'sections' ? dragging.groupKey : null),
           }}
         >
-          <div className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-gray-300 dark:border-gray-600" />
+          <div className="mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 border-white/50" />
           <p className="flex-1 text-sm leading-tight truncate min-w-0">{draggingTodo.title}</p>
           <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${PRIORITY_COLORS[draggingTodo.priority]}`} />
         </div>
@@ -812,19 +809,19 @@ export default function TodoWidget() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">To-Do</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">{todos.filter(t => !t.completed).length} remaining</p>
+          <p className="text-sm font-semibold uppercase tracking-wider opacity-80">To-Do</p>
+          <p className="text-xs opacity-60">{todos.filter(t => !t.completed).length} remaining</p>
         </div>
         <div className="flex gap-1.5 items-center">
           <button
             onClick={() => setShowCompleted(p => !p)}
-            className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+            className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition"
           >
             {showCompleted ? 'Hide done' : 'Show done'}
           </button>
           <button
             onClick={() => setAdding(p => !p)}
-            className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
+            className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition"
           >
             + Add
           </button>
@@ -832,16 +829,13 @@ export default function TodoWidget() {
       </div>
 
       {/* View toggle */}
-      <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-800 rounded p-0.5 self-start border border-gray-200 dark:border-gray-700">
+      <div className="flex gap-0.5 bg-white/10 rounded-full p-0.5 self-start">
         {(['priority', 'sections'] as View[]).map(v => (
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`text-xs capitalize px-3 py-1 rounded transition ${
-              view === v
-                ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-medium shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+            className={`text-xs capitalize px-3 py-1 rounded-full transition
+              ${view === v ? 'bg-white text-rose-500 font-bold' : 'hover:bg-white/20'}`}
           >
             {v}
           </button>
@@ -850,10 +844,10 @@ export default function TodoWidget() {
 
       {/* Add task form */}
       {adding && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 space-y-2 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white/10 rounded-xl p-3 space-y-2">
           <input
             autoFocus
-            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+            className="w-full bg-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 outline-none"
             placeholder="Task title"
             value={newTodo.title}
             onChange={e => setNewTodo(p => ({ ...p, title: e.target.value }))}
@@ -861,17 +855,17 @@ export default function TodoWidget() {
           />
           <div className="flex gap-2">
             <select
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+              className="flex-1 bg-white/20 rounded-lg px-2 py-1.5 text-sm outline-none"
               value={newTodo.priority}
               onChange={e => setNewTodo(p => ({ ...p, priority: e.target.value as Priority }))}
             >
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="high" className="text-black">High</option>
+              <option value="medium" className="text-black">Medium</option>
+              <option value="low" className="text-black">Low</option>
             </select>
             <input
               type="date"
-              className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-gray-400 transition"
+              className="flex-1 bg-white/20 rounded-lg px-3 py-1.5 text-sm outline-none"
               value={newTodo.due_date}
               onChange={e => setNewTodo(p => ({ ...p, due_date: e.target.value }))}
             />
@@ -882,19 +876,18 @@ export default function TodoWidget() {
                 <button
                   key={s.id}
                   onClick={() => toggleSectionPick(s.id)}
-                  className="text-xs px-2.5 py-1 rounded border transition"
-                  style={s.color && newTodo.sectionIds.includes(s.id)
-                    ? { backgroundColor: toRgba(s.color, 0.2), borderColor: toRgba(s.color, 0.5), fontWeight: 600 }
-                    : newTodo.sectionIds.includes(s.id)
-                      ? { backgroundColor: 'rgba(0,0,0,0.08)', borderColor: 'rgba(0,0,0,0.25)', fontWeight: 600 }
-                      : { borderColor: 'rgba(0,0,0,0.12)' }}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition
+                    ${newTodo.sectionIds.includes(s.id)
+                      ? 'bg-white text-rose-500 border-white font-semibold'
+                      : 'border-white/40 hover:bg-white/20'}`}
+                  style={s.color && newTodo.sectionIds.includes(s.id) ? { backgroundColor: s.color, color: 'white', borderColor: s.color } : {}}
                 >
                   {s.name}
                 </button>
               ))}
             </div>
           )}
-          <button onClick={addTodo} className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1.5 rounded transition">
+          <button onClick={addTodo} className="w-full bg-white text-rose-500 font-semibold text-sm py-1.5 rounded-lg">
             Save
           </button>
         </div>
@@ -903,7 +896,7 @@ export default function TodoWidget() {
       {/* Content */}
       {loading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-8 bg-gray-200 dark:bg-gray-700 rounded" />)}
+          {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-8 bg-white/20 rounded-lg" />)}
         </div>
       ) : (
         <div className="overflow-y-auto flex-1 pr-0.5 flex flex-col gap-4">
@@ -911,7 +904,7 @@ export default function TodoWidget() {
           {/* ── Priority view ── */}
           {view === 'priority' && (
             visibleTodos.length === 0
-              ? <p className="text-sm text-gray-400">No tasks. Great work!</p>
+              ? <p className="text-sm opacity-60">No tasks. Great work!</p>
               : (['high', 'medium', 'low'] as Priority[]).map(p => {
                 const group = visibleTodos.filter(t => t.priority === p)
                 if (group.length === 0) return null
@@ -919,9 +912,12 @@ export default function TodoWidget() {
                   <div key={p}>
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[p]}`} />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{p}</span>
+                      <span className="text-xs font-semibold uppercase tracking-wider opacity-70">{p}</span>
                     </div>
-                    <div className="flex flex-col gap-1.5 rounded p-2 min-h-[2.5rem] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                    <div
+                      className="flex flex-col gap-1.5 rounded-xl p-2 min-h-[2.5rem]"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    >
                       {renderGroup(group, null, p)}
                     </div>
                   </div>
