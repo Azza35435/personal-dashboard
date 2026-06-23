@@ -109,6 +109,10 @@ export default function GymWidget() {
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null)
   const [editingExerciseForm, setEditingExerciseForm] = useState(EMPTY_EX)
 
+  // Session title edit
+  const [editingSessionTitleId, setEditingSessionTitleId] = useState<string | null>(null)
+  const [editingSessionTitle, setEditingSessionTitle] = useState('')
+
   // Week/All expand state
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -250,6 +254,13 @@ export default function GymWidget() {
 
   const deleteExercise = async (id: string) => {
     await supabase.from('gym_exercises').delete().eq('id', id)
+    load()
+  }
+
+  const saveSessionTitle = async (id: string) => {
+    if (!editingSessionTitle.trim()) return
+    await supabase.from('gym_sessions').update({ workout_type: editingSessionTitle.trim() }).eq('id', id)
+    setEditingSessionTitleId(null)
     load()
   }
 
@@ -603,7 +614,18 @@ export default function GymWidget() {
                     <div className="flex items-center gap-2">
                       <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: colorHex(selectedSession.color) }} />
                       <div>
-                        <p className="text-sm font-medium">{selectedSession.workout_type}</p>
+                        {editingSessionTitleId === selectedSession.id ? (
+                          <input
+                            autoFocus
+                            className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                            value={editingSessionTitle}
+                            onChange={e => setEditingSessionTitle(e.target.value)}
+                            onBlur={() => saveSessionTitle(selectedSession.id)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(selectedSession.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }}
+                          />
+                        ) : (
+                          <p className="text-sm font-medium cursor-text hover:text-gray-500 dark:hover:text-gray-400 transition" onClick={() => { setEditingSessionTitleId(selectedSession.id); setEditingSessionTitle(selectedSession.workout_type) }}>{selectedSession.workout_type}</p>
+                        )}
                         <p className="text-xs text-gray-400 dark:text-gray-500">
                           {fmtDate(selectedSession.date)}{selectedSession.duration_minutes ? ` · ${selectedSession.duration_minutes} min` : ''}
                         </p>
@@ -784,7 +806,19 @@ export default function GymWidget() {
                       onClick={() => toggleExpand(session.id)}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{session.workout_type}</p>
+                        {editingSessionTitleId === session.id ? (
+                          <input
+                            autoFocus
+                            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                            value={editingSessionTitle}
+                            onChange={e => setEditingSessionTitle(e.target.value)}
+                            onBlur={() => saveSessionTitle(session.id)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(session.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }}
+                            onClick={e => e.stopPropagation()}
+                          />
+                        ) : (
+                          <p className="text-sm font-medium cursor-text" onClick={e => { e.stopPropagation(); setEditingSessionTitleId(session.id); setEditingSessionTitle(session.workout_type) }}>{session.workout_type}</p>
+                        )}
                         <p className="text-xs text-gray-400 dark:text-gray-500">
                           {fmtDate(session.date)}
                           {session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}
