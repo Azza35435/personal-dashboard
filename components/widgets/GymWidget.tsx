@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { GymSession, GymExercise, GymTemplate, GymTemplateExercise, GymSetRow } from '@/lib/types'
 
@@ -160,6 +160,32 @@ export default function GymWidget() {
   const [selectedExIds, setSelectedExIds] = useState<Set<string>>(new Set())
   const [addingToSuperset, setAddingToSuperset] = useState<{ sessionId: string; groupId: string } | null>(null)
 
+  // Exercise drag-and-drop state
+  const [exDragging, setExDragging] = useState<{
+    sessionId: string
+    dragIndex: number
+    overIndex: number
+    items: ExListItem[]
+    hoverGroupId: string | null
+  } | null>(null)
+  const exDraggingRef = useRef(exDragging)
+  exDraggingRef.current = exDragging
+
+  // Intra-superset drag state (reorder within group + drag out)
+  const [superDragging, setSuperDragging] = useState<{
+    sessionId: string
+    groupId: string
+    dragIndex: number
+    overIndex: number
+    exs: GymExercise[]
+    outerOverIndex: number | null
+  } | null>(null)
+  const superDraggingRef = useRef(superDragging)
+  superDraggingRef.current = superDragging
+
+  const exercisesRef = useRef(exercises)
+  exercisesRef.current = exercises
+
   useEffect(() => {
     const b = localStorage.getItem(BORDER_STORAGE_KEY)
     if (b) setWidgetBorder(b)
@@ -227,6 +253,180 @@ export default function GymWidget() {
   useEffect(() => { load() }, [load])
   useEffect(() => { loadMonthNutrition() }, [loadMonthNutrition])
   useEffect(() => { loadTemplates() }, [loadTemplates])
+
+  useEffect(() => {
+    if (!exDragging) return
+    const sessionId = exDragging.sessionId
+
+    const onMove = (e: PointerEvent) => {
+      const els = document.elementsFromPoint(e.clientX, e.clientY)
+      const drag = exDraggingRef.current
+      // If dragging a solo exercise, check for superset hover (join-superset)
+      if (drag && drag.items[drag.dragIndex]?.kind === 'solo') {
+        const superEl = els.find(el => {
+          const h = el as HTMLElement
+          return h.dataset?.sessionId === sessionId && h.dataset?.supersetGroup !== undefined
+        }) as HTMLElement | undefined
+        if (superEl) {
+          setExDragging(d => d ? { ...d, hoverGroupId: superEl.dataset.supersetGroup! } : d)
+          return
+        }
+      }
+      const el = els.find(el => {
+        const h = el as HTMLElement
+        return h.dataset?.sessionId === sessionId && h.dataset?.exItemIndex !== undefined
+      }) as HTMLElement | undefined
+      if (el) {
+        const idx = parseInt(el.dataset.exItemIndex!)
+        setExDragging(d => d ? { ...d, overIndex: idx, hoverGroupId: null } : d)
+      }
+    }
+
+    const onUp = async () => {
+      const drag = exDraggingRef.current
+      if (!drag) return
+      setExDragging(null)
+
+      // Join-superset drop
+      if (drag.hoverGroupId && drag.items[drag.dragIndex]?.kind === 'solo') {
+        const ex = (drag.items[drag.dragIndex] as { kind: 'solo'; ex: GymExercise }).ex
+        await supabase.from('gym_exercises').update({ superset_group: drag.hoverGroupId }).eq('id', ex.id)
+        load()
+        return
+      }
+
+      const { sessionId: sid, dragIndex, overIndex, items } = drag
+      if (dragIndex === overIndex) return
+      const insertAt = overIndex > dragIndex ? overIndex - 1 : overIndex
+      if (insertAt === dragIndex) return
+
+      const reordered = [...items]
+      reordered.splice(dragIndex, 1)
+      reordered.splice(insertAt, 0, items[dragIndex])
+
+      let pos = 0
+      const updates: { id: string; position: number }[] = []
+      for (const item of reordered) {
+        if (item.kind === 'solo') {
+          updates.push({ id: item.ex.id, position: pos++ })
+        } else {
+          for (const ex of item.exs) {
+            updates.push({ id: ex.id, position: pos++ })
+          }
+        }
+      }
+      await Promise.all(updates.map(u =>
+        supabase.from('gym_exercises').update({ position: u.position }).eq('id', u.id)
+      ))
+      load()
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!exDragging])
+
+  useEffect(() => {
+    if (!superDragging) return
+    const { sessionId, groupId } = superDragging
+
+    const onMove = (e: PointerEvent) => {
+      const els = document.elementsFromPoint(e.clientX, e.clientY)
+
+      // Check if still within this superset's container
+      const inContainer = els.some(el => (el as HTMLElement).dataset?.supersetGroup === groupId)
+      if (inContainer) {
+        const intraEl = els.find(el => {
+          const h = el as HTMLElement
+          return h.dataset?.intraGroupId === groupId && h.dataset?.intraExIndex !== undefined
+        }) as HTMLElement | undefined
+        if (intraEl) {
+          const idx = parseInt(intraEl.dataset.intraExIndex!)
+          setSuperDragging(d => d ? { ...d, overIndex: idx, outerOverIndex: null } : d)
+        }
+        return
+      }
+
+      // Outside superset — track outer position for drag-out drop
+      const outerEl = els.find(el => {
+        const h = el as HTMLElement
+        return h.dataset?.sessionId === sessionId && h.dataset?.exItemIndex !== undefined
+      }) as HTMLElement | undefined
+      if (outerEl) {
+        const idx = parseInt(outerEl.dataset.exItemIndex!)
+        setSuperDragging(d => d ? { ...d, outerOverIndex: idx } : d)
+      }
+    }
+
+    const onUp = async () => {
+      const drag = superDraggingRef.current
+      if (!drag) return
+      setSuperDragging(null)
+      const { sessionId: sid, groupId: gId, dragIndex, overIndex, exs, outerOverIndex } = drag
+
+      if (outerOverIndex !== null) {
+        // Drag-out: detach exercise, insert at outer position
+        const detachedEx = exs[dragIndex]
+        const currentSessionExs = exercisesRef.current[sid] ?? []
+        const currentOuterItems = groupExercises(currentSessionExs)
+        const groupRemainingExs = currentSessionExs.filter(e => e.superset_group === gId && e.id !== detachedEx.id)
+
+        const newOuterItems: ExListItem[] = []
+        for (const item of currentOuterItems) {
+          if (item.kind === 'super' && item.groupId === gId) {
+            if (groupRemainingExs.length === 1) newOuterItems.push({ kind: 'solo', ex: groupRemainingExs[0] })
+            else if (groupRemainingExs.length >= 2) newOuterItems.push({ kind: 'super', groupId: gId, exs: groupRemainingExs })
+          } else {
+            newOuterItems.push(item)
+          }
+        }
+        const insertIdx = Math.min(outerOverIndex, newOuterItems.length)
+        newOuterItems.splice(insertIdx, 0, { kind: 'solo', ex: { ...detachedEx, superset_group: null } })
+
+        let pos = 0
+        const updates: { id: string; position: number; clearGroup?: boolean }[] = []
+        for (const item of newOuterItems) {
+          if (item.kind === 'solo') {
+            updates.push({ id: item.ex.id, position: pos++, clearGroup: item.ex.id === detachedEx.id || (groupRemainingExs.length === 1 && item.ex.id === groupRemainingExs[0].id) })
+          } else {
+            for (const ex of item.exs) updates.push({ id: ex.id, position: pos++ })
+          }
+        }
+        await Promise.all(updates.map(u =>
+          supabase.from('gym_exercises').update(u.clearGroup ? { position: u.position, superset_group: null } : { position: u.position }).eq('id', u.id)
+        ))
+        load()
+        return
+      }
+
+      if (dragIndex === overIndex) return
+      const insertAt = overIndex > dragIndex ? overIndex - 1 : overIndex
+      if (insertAt === dragIndex) return
+
+      // Reorder within superset, preserving position slot
+      const reordered = [...exs]
+      reordered.splice(dragIndex, 1)
+      reordered.splice(insertAt, 0, exs[dragIndex])
+      const currentSessionExs = exercisesRef.current[sid] ?? []
+      const groupPositions = currentSessionExs.filter(e => e.superset_group === gId).map(e => e.position).sort((a, b) => a - b)
+      await Promise.all(reordered.map((ex, j) =>
+        supabase.from('gym_exercises').update({ position: groupPositions[j] ?? j }).eq('id', ex.id)
+      ))
+      load()
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!superDragging])
 
   const changeBorder = (b: string) => { setWidgetBorder(b); localStorage.setItem(BORDER_STORAGE_KEY, b) }
 
@@ -473,6 +673,17 @@ export default function GymWidget() {
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
+  const startExDrag = (e: React.PointerEvent, sessionId: string, index: number, items: ExListItem[]) => {
+    e.preventDefault()
+    setExDragging({ sessionId, dragIndex: index, overIndex: index, items, hoverGroupId: null })
+  }
+
+  const startSuperDrag = (e: React.PointerEvent, sessionId: string, groupId: string, index: number, exs: GymExercise[]) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSuperDragging({ sessionId, groupId, dragIndex: index, overIndex: index, exs, outerOverIndex: null })
+  }
+
   // ── Render helpers (plain functions, NOT React components — avoids remount/focus-jump bug) ──
 
   const renderColorPicker = (value: string, onChange: (c: string) => void) => (
@@ -618,13 +829,38 @@ export default function GymWidget() {
 
   const renderExerciseList = (sessionId: string, exs: GymExercise[]) => {
     const items = groupExercises(exs)
-    return items.map((item) => {
+    const isDraggingHere = exDragging?.sessionId === sessionId
+    const dragIdx = isDraggingHere ? exDragging!.dragIndex : -1
+    const overIdx = isDraggingHere ? exDragging!.overIndex : -1
+    const hoverGroupId = isDraggingHere ? exDragging!.hoverGroupId : null
+
+    // Outer gap from intra-superset drag-out
+    const isSuperDraggingHere = superDragging?.sessionId === sessionId
+    const outerOverIdx = isSuperDraggingHere ? superDragging!.outerOverIndex : null
+
+    const outerGapAt = (i: number) =>
+      (isDraggingHere && overIdx === i && dragIdx !== i) ||
+      (outerOverIdx !== null && outerOverIdx === i)
+
+    const elements: React.ReactNode[] = []
+
+    items.forEach((item, i) => {
+      const isDragging = isDraggingHere && dragIdx === i
+      const itemKey = item.kind === 'solo' ? item.ex.id : item.groupId
+
+      if (outerGapAt(i)) {
+        elements.push(
+          <div key={`gap-${i}`} className="h-8 rounded border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950" />
+        )
+      }
+
+      let content: React.ReactNode
       if (item.kind === 'solo') {
         const ex = item.ex
         if (selectMode === sessionId) {
           const isSelected = selectedExIds.has(ex.id)
-          return (
-            <div key={ex.id} className="flex items-start gap-1.5">
+          content = (
+            <div className="flex items-start gap-1.5">
               <button
                 onClick={() => toggleSelectEx(ex.id)}
                 className={`mt-2 w-3.5 h-3.5 rounded border-2 flex-shrink-0 transition ${isSelected ? 'bg-gray-800 dark:bg-gray-200 border-gray-800 dark:border-gray-200' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'}`}
@@ -632,16 +868,50 @@ export default function GymWidget() {
               <div className="flex-1 min-w-0">{renderExerciseRow(ex, sessionId)}</div>
             </div>
           )
+        } else {
+          content = renderExerciseRow(ex, sessionId)
         }
-        return renderExerciseRow(ex, sessionId)
       } else {
         const { groupId, exs: groupExs } = item
         const isAddingHere = addingToSuperset?.groupId === groupId
-        return (
-          <div key={groupId} className="relative pl-3">
+        const isJoinTarget = hoverGroupId === groupId
+        const isSuperDragGroup = superDragging?.groupId === groupId && superDragging.sessionId === sessionId
+        const intraDragIdx = isSuperDragGroup ? superDragging!.dragIndex : -1
+        const intraOverIdx = isSuperDragGroup ? superDragging!.overIndex : -1
+        const intraOuterSet = isSuperDragGroup && superDragging!.outerOverIndex !== null
+
+        content = (
+          <div
+            data-superset-group={groupId}
+            data-session-id={sessionId}
+            className={`relative pl-3 rounded transition ${isJoinTarget ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
+          >
             <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-gray-300 dark:bg-gray-600 rounded-full" />
             <div className="space-y-1">
-              {groupExs.map(ex => renderExerciseRow(ex, sessionId, groupId))}
+              {groupExs.map((ex, j) => {
+                const isIntraDragging = isSuperDragGroup && intraDragIdx === j && !intraOuterSet
+                return (
+                  <div key={ex.id}>
+                    {isSuperDragGroup && !intraOuterSet && intraOverIdx === j && intraDragIdx !== j && (
+                      <div className="h-6 mb-1 rounded border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950" />
+                    )}
+                    <div
+                      data-intra-ex-index={j}
+                      data-intra-group-id={groupId}
+                      className={`flex items-start gap-0.5 group/superex ${isIntraDragging ? 'opacity-30' : ''}`}
+                    >
+                      <div
+                        className="opacity-0 group-hover/superex:opacity-40 cursor-grab active:cursor-grabbing touch-none shrink-0 mt-2 px-0.5 text-gray-400 select-none text-sm"
+                        onPointerDown={e => startSuperDrag(e, sessionId, groupId, j, groupExs)}
+                      >⠿</div>
+                      <div className="flex-1 min-w-0">{renderExerciseRow(ex, sessionId, groupId)}</div>
+                    </div>
+                  </div>
+                )
+              })}
+              {isSuperDragGroup && !intraOuterSet && intraOverIdx === groupExs.length && intraDragIdx !== groupExs.length - 1 && (
+                <div className="h-6 rounded border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950" />
+              )}
             </div>
             {isAddingHere ? (
               <div className="mt-1 space-y-1.5 bg-gray-50 dark:bg-gray-800 rounded p-2 border border-gray-200 dark:border-gray-700">
@@ -667,7 +937,43 @@ export default function GymWidget() {
           </div>
         )
       }
+
+      elements.push(
+        <div
+          key={itemKey}
+          data-ex-item-index={i}
+          data-session-id={sessionId}
+          className={`flex items-start gap-0.5 group/exitem ${isDragging ? 'opacity-30' : ''}`}
+        >
+          {selectMode !== sessionId && (
+            <div
+              className="opacity-0 group-hover/exitem:opacity-40 cursor-grab active:cursor-grabbing touch-none shrink-0 mt-2 px-0.5 text-gray-400 select-none text-sm"
+              onPointerDown={e => startExDrag(e, sessionId, i, items)}
+            >⠿</div>
+          )}
+          <div className="flex-1 min-w-0">{content}</div>
+        </div>
+      )
     })
+
+    const needEndDropZone = isDraggingHere || isSuperDraggingHere
+    if (needEndDropZone) {
+      if (outerGapAt(items.length)) {
+        elements.push(
+          <div key="gap-end" className="h-8 rounded border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950" />
+        )
+      }
+      elements.push(
+        <div
+          key="drop-zone-end"
+          data-ex-item-index={items.length}
+          data-session-id={sessionId}
+          className="h-4"
+        />
+      )
+    }
+
+    return elements
   }
 
   const renderExerciseAdd = (sessionId: string) => {
