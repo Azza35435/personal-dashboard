@@ -34,6 +34,9 @@ const NUTRITION_TARGETS_KEY = 'nutrition_targets'
 type View = 'month' | 'week' | 'all'
 type SetFormRow = { reps: string; weight_kg: string }
 type ExFormState = { name: string; sets: SetFormRow[] }
+type ExListItem =
+  | { kind: 'solo'; ex: GymExercise }
+  | { kind: 'super'; groupId: string; exs: GymExercise[] }
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 const emptySessionForm = (date?: string) => ({ date: date ?? todayStr(), workout_type: '', duration_minutes: '', color: 'blue' })
@@ -77,7 +80,6 @@ function buildMonthGrid(year: number, month: number): (string | null)[][] {
   return weeks
 }
 
-// Compact header summary (used when sets all match)
 function fmtExSummary(ex: GymExercise): string {
   const sd = ex.sets_data
   if (sd && sd.length > 0) {
@@ -96,9 +98,22 @@ function fmtExSummary(ex: GymExercise): string {
   return parts.join(' @ ')
 }
 
-// Returns true if sets_data has more than one entry (always show per-set lines)
 function hasPerSetData(ex: GymExercise): boolean {
   return !!(ex.sets_data && ex.sets_data.length > 0)
+}
+
+function groupExercises(exs: GymExercise[]): ExListItem[] {
+  const items: ExListItem[] = []
+  const seen = new Set<string>()
+  for (const ex of exs) {
+    if (!ex.superset_group) {
+      items.push({ kind: 'solo', ex })
+    } else if (!seen.has(ex.superset_group)) {
+      seen.add(ex.superset_group)
+      items.push({ kind: 'super', groupId: ex.superset_group, exs: exs.filter(e => e.superset_group === ex.superset_group) })
+    }
+  }
+  return items
 }
 
 export default function GymWidget() {
@@ -137,6 +152,13 @@ export default function GymWidget() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [savingTemplate, setSavingTemplate] = useState<string | null>(null)
   const [templateName, setTemplateName] = useState('')
+
+  // Superset state
+  const [addingSupersetTo, setAddingSupersetTo] = useState<string | null>(null)
+  const [supersetRows, setSupersetRows] = useState<ExFormState[]>([emptyExForm(), emptyExForm()])
+  const [selectMode, setSelectMode] = useState<string | null>(null)
+  const [selectedExIds, setSelectedExIds] = useState<Set<string>>(new Set())
+  const [addingToSuperset, setAddingToSuperset] = useState<{ sessionId: string; groupId: string } | null>(null)
 
   useEffect(() => {
     const b = localStorage.getItem(BORDER_STORAGE_KEY)
@@ -217,8 +239,24 @@ export default function GymWidget() {
     if (newSess && selectedTemplateId) {
       const tmplExs = templateExercises[selectedTemplateId] ?? []
       if (tmplExs.length > 0) {
+        // Remap superset group UUIDs to fresh ones for this session
+        const groupIdMap: Record<string, string> = {}
+        for (const ex of tmplExs) {
+          if (ex.superset_group && !groupIdMap[ex.superset_group]) {
+            groupIdMap[ex.superset_group] = crypto.randomUUID()
+          }
+        }
         await supabase.from('gym_exercises').insert(
-          tmplExs.map(ex => ({ session_id: newSess.id, name: ex.name, sets: ex.sets, reps: ex.reps, weight_kg: ex.weight_kg, sets_data: ex.sets_data, position: ex.position }))
+          tmplExs.map(ex => ({
+            session_id: newSess.id,
+            name: ex.name,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight_kg: ex.weight_kg,
+            sets_data: ex.sets_data,
+            position: ex.position,
+            superset_group: ex.superset_group ? (groupIdMap[ex.superset_group] ?? null) : null,
+          }))
         )
       }
     }
@@ -259,7 +297,95 @@ export default function GymWidget() {
     load()
   }
 
+  const addSuperset = async (sessionId: string) => {
+    const validRows = supersetRows.filter(r => r.name.trim())
+    if (validRows.length < 2) return
+    const groupId = crypto.randomUUID()
+    const existing = exercises[sessionId] ?? []
+    const inserts = validRows.map((row, i) => {
+      const setsData = buildSetsData(row.sets)
+      return {
+        session_id: sessionId,
+        name: row.name.trim(),
+        sets: setsData.length,
+        reps: setsData[0]?.reps ?? null,
+        weight_kg: setsData[0]?.weight_kg ?? null,
+        sets_data: setsData,
+        position: existing.length + i,
+        superset_group: groupId,
+      }
+    })
+    await supabase.from('gym_exercises').insert(inserts)
+    setAddingSupersetTo(null)
+    setSupersetRows([emptyExForm(), emptyExForm()])
+    load()
+  }
+
+  const addExerciseToSuperset = async (sessionId: string, groupId: string) => {
+    if (!exerciseForm.name.trim()) return
+    const existing = exercises[sessionId] ?? []
+    const setsData = buildSetsData(exerciseForm.sets)
+    await supabase.from('gym_exercises').insert({
+      session_id: sessionId,
+      name: exerciseForm.name.trim(),
+      sets: setsData.length,
+      reps: setsData[0]?.reps ?? null,
+      weight_kg: setsData[0]?.weight_kg ?? null,
+      sets_data: setsData,
+      position: existing.length,
+      superset_group: groupId,
+    })
+    setAddingToSuperset(null)
+    setExerciseForm(emptyExForm())
+    load()
+  }
+
+  const groupAsSuperset = async (sessionId: string) => {
+    const ids = Array.from(selectedExIds)
+    if (ids.length < 2) return
+    const groupId = crypto.randomUUID()
+    await supabase.from('gym_exercises').update({ superset_group: groupId }).in('id', ids)
+    setSelectMode(null)
+    setSelectedExIds(new Set())
+    load()
+  }
+
+  const removeFromSuperset = async (exId: string, groupId: string, sessionId: string) => {
+    const sessionExs = exercises[sessionId] ?? []
+    const groupCount = sessionExs.filter(e => e.superset_group === groupId).length
+    if (groupCount <= 2) {
+      await supabase.from('gym_exercises').update({ superset_group: null }).eq('superset_group', groupId)
+    } else {
+      await supabase.from('gym_exercises').update({ superset_group: null }).eq('id', exId)
+    }
+    setEditingExerciseId(null)
+    load()
+  }
+
+  const dissolveSuperset = async (groupId: string) => {
+    await supabase.from('gym_exercises').update({ superset_group: null }).eq('superset_group', groupId)
+    setEditingExerciseId(null)
+    load()
+  }
+
+  const toggleSelectEx = (exId: string) => {
+    setSelectedExIds(prev => {
+      const n = new Set(prev)
+      n.has(exId) ? n.delete(exId) : n.add(exId)
+      return n
+    })
+  }
+
   const deleteExercise = async (id: string) => {
+    const allExs = Object.values(exercises).flat()
+    const ex = allExs.find(e => e.id === id)
+    if (ex?.superset_group) {
+      const sessionExs = exercises[ex.session_id] ?? []
+      const groupCount = sessionExs.filter(e => e.superset_group === ex.superset_group).length
+      if (groupCount <= 2) {
+        await supabase.from('gym_exercises').update({ superset_group: null }).eq('superset_group', ex.superset_group)
+      }
+    }
     await supabase.from('gym_exercises').delete().eq('id', id)
     load()
   }
@@ -272,7 +398,6 @@ export default function GymWidget() {
         sets: ex.sets_data.map(s => ({ reps: s.reps != null ? String(s.reps) : '', weight_kg: s.weight_kg != null ? String(s.weight_kg) : '' })),
       })
     } else {
-      // Legacy: convert sets×reps×weight to per-set rows
       const count = ex.sets ?? 1
       setEditingExerciseForm({
         name: ex.name,
@@ -315,7 +440,16 @@ export default function GymWidget() {
       const exs = exercises[session.id] ?? []
       if (exs.length > 0) {
         await supabase.from('gym_template_exercises').insert(
-          exs.map(ex => ({ template_id: newTmpl.id, name: ex.name, sets: ex.sets, reps: ex.reps, weight_kg: ex.weight_kg, sets_data: ex.sets_data, position: ex.position }))
+          exs.map(ex => ({
+            template_id: newTmpl.id,
+            name: ex.name,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight_kg: ex.weight_kg,
+            sets_data: ex.sets_data,
+            position: ex.position,
+            superset_group: ex.superset_group ?? null,
+          }))
         )
       }
     }
@@ -381,7 +515,6 @@ export default function GymWidget() {
     </div>
   )
 
-  // Per-set rows used in both add and edit forms
   const renderSetRows = (sets: SetFormRow[], onChange: (sets: SetFormRow[]) => void, onEnter: () => void) => (
     <div className="space-y-1">
       <div className="grid grid-cols-[28px_1fr_1fr_20px] gap-1 px-0.5">
@@ -426,8 +559,7 @@ export default function GymWidget() {
     </div>
   )
 
-  // Exercise rows for list display (always expanded per-set)
-  const renderExerciseRow = (ex: GymExercise) => {
+  const renderExerciseRow = (ex: GymExercise, sessionId: string, groupId?: string | null) => {
     const isEditing = editingExerciseId === ex.id
     const sets = ex.sets_data
     const showPerSet = hasPerSetData(ex)
@@ -447,6 +579,12 @@ export default function GymWidget() {
             <button onClick={() => setEditingExerciseId(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
             <button onClick={() => saveEditExercise(ex.id)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1 rounded transition">Save</button>
           </div>
+          {groupId && (
+            <div className="flex gap-3 border-t border-gray-100 dark:border-gray-700 pt-1.5">
+              <button onClick={() => removeFromSuperset(ex.id, groupId, sessionId)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Remove from group</button>
+              <button onClick={() => dissolveSuperset(groupId)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Dissolve group</button>
+            </div>
+          )}
         </div>
       )
     }
@@ -478,28 +616,140 @@ export default function GymWidget() {
     )
   }
 
-  const renderExerciseAdd = (sessionId: string) => (
-    addingExerciseTo === sessionId ? (
-      <div className="space-y-1.5 bg-gray-50 dark:bg-gray-800 rounded p-2 border border-gray-200 dark:border-gray-700">
-        <input
-          autoFocus
-          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-          placeholder="Exercise name"
-          value={exerciseForm.name}
-          onChange={e => setExerciseForm(f => ({ ...f, name: e.target.value }))}
-        />
-        {renderSetRows(exerciseForm.sets, sets => setExerciseForm(f => ({ ...f, sets })), () => addExercise(sessionId))}
-        <div className="flex gap-2 justify-end pt-0.5">
-          <button onClick={() => { setAddingExerciseTo(null); setExerciseForm(emptyExForm()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
-          <button onClick={() => addExercise(sessionId)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1.5 rounded transition">Add</button>
+  const renderExerciseList = (sessionId: string, exs: GymExercise[]) => {
+    const items = groupExercises(exs)
+    return items.map((item) => {
+      if (item.kind === 'solo') {
+        const ex = item.ex
+        if (selectMode === sessionId) {
+          const isSelected = selectedExIds.has(ex.id)
+          return (
+            <div key={ex.id} className="flex items-start gap-1.5">
+              <button
+                onClick={() => toggleSelectEx(ex.id)}
+                className={`mt-2 w-3.5 h-3.5 rounded border-2 flex-shrink-0 transition ${isSelected ? 'bg-gray-800 dark:bg-gray-200 border-gray-800 dark:border-gray-200' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900'}`}
+              />
+              <div className="flex-1 min-w-0">{renderExerciseRow(ex, sessionId)}</div>
+            </div>
+          )
+        }
+        return renderExerciseRow(ex, sessionId)
+      } else {
+        const { groupId, exs: groupExs } = item
+        const isAddingHere = addingToSuperset?.groupId === groupId
+        return (
+          <div key={groupId} className="relative pl-3">
+            <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            <div className="space-y-1">
+              {groupExs.map(ex => renderExerciseRow(ex, sessionId, groupId))}
+            </div>
+            {isAddingHere ? (
+              <div className="mt-1 space-y-1.5 bg-gray-50 dark:bg-gray-800 rounded p-2 border border-gray-200 dark:border-gray-700">
+                <input
+                  autoFocus
+                  className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                  placeholder="Exercise name"
+                  value={exerciseForm.name}
+                  onChange={e => setExerciseForm(f => ({ ...f, name: e.target.value }))}
+                />
+                {renderSetRows(exerciseForm.sets, sets => setExerciseForm(f => ({ ...f, sets })), () => addExerciseToSuperset(sessionId, groupId))}
+                <div className="flex gap-2 justify-end pt-0.5">
+                  <button onClick={() => { setAddingToSuperset(null); setExerciseForm(emptyExForm()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
+                  <button onClick={() => addExerciseToSuperset(sessionId, groupId)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1.5 rounded transition">Add</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setAddingToSuperset({ sessionId, groupId }); setExerciseForm(emptyExForm()); setAddingExerciseTo(null); setAddingSupersetTo(null) }}
+                className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition mt-1 pl-0.5"
+              >+ Add to group</button>
+            )}
+          </div>
+        )
+      }
+    })
+  }
+
+  const renderExerciseAdd = (sessionId: string) => {
+    const isAddingHere = addingExerciseTo === sessionId
+    const isAddingSuperset = addingSupersetTo === sessionId
+    const isInSelectMode = selectMode === sessionId
+
+    if (isAddingHere) {
+      return (
+        <div className="space-y-1.5 bg-gray-50 dark:bg-gray-800 rounded p-2 border border-gray-200 dark:border-gray-700">
+          <input
+            autoFocus
+            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+            placeholder="Exercise name"
+            value={exerciseForm.name}
+            onChange={e => setExerciseForm(f => ({ ...f, name: e.target.value }))}
+          />
+          {renderSetRows(exerciseForm.sets, sets => setExerciseForm(f => ({ ...f, sets })), () => addExercise(sessionId))}
+          <div className="flex gap-2 justify-end pt-0.5">
+            <button onClick={() => { setAddingExerciseTo(null); setExerciseForm(emptyExForm()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
+            <button onClick={() => addExercise(sessionId)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1.5 rounded transition">Add</button>
+          </div>
         </div>
+      )
+    }
+
+    if (isAddingSuperset) {
+      return (
+        <div className="space-y-2 bg-gray-50 dark:bg-gray-800 rounded p-2 border border-gray-200 dark:border-gray-700">
+          {supersetRows.map((row, i) => (
+            <div key={i} className={i > 0 ? 'border-t border-gray-200 dark:border-gray-700 pt-2 space-y-1.5' : 'space-y-1.5'}>
+              <input
+                autoFocus={i === 0}
+                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+                placeholder={`Exercise ${i + 1}`}
+                value={row.name}
+                onChange={e => setSupersetRows(rows => rows.map((r, j) => j === i ? { ...r, name: e.target.value } : r))}
+              />
+              {renderSetRows(row.sets, sets => setSupersetRows(rows => rows.map((r, j) => j === i ? { ...r, sets } : r)), () => addSuperset(sessionId))}
+            </div>
+          ))}
+          <button
+            onClick={() => setSupersetRows(rows => [...rows, emptyExForm()])}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+          >+ Add exercise</button>
+          <div className="flex gap-2 justify-end pt-0.5">
+            <button onClick={() => { setAddingSupersetTo(null); setSupersetRows([emptyExForm(), emptyExForm()]) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-2">Cancel</button>
+            <button onClick={() => addSuperset(sessionId)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1.5 rounded transition">Save superset</button>
+          </div>
+        </div>
+      )
+    }
+
+    if (isInSelectMode) {
+      return (
+        <div className="flex items-center gap-2">
+          {selectedExIds.size >= 2 && (
+            <button onClick={() => groupAsSuperset(sessionId)} className="text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium px-2.5 py-1 rounded transition">
+              Group ({selectedExIds.size})
+            </button>
+          )}
+          <button onClick={() => { setSelectMode(null); setSelectedExIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+            Cancel
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={() => { setAddingExerciseTo(sessionId); setExerciseForm(emptyExForm()); setAddingSupersetTo(null); setAddingToSuperset(null) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+          + Add exercise
+        </button>
+        <button onClick={() => { setAddingSupersetTo(sessionId); setSupersetRows([emptyExForm(), emptyExForm()]); setAddingExerciseTo(null); setAddingToSuperset(null) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+          + Add superset
+        </button>
+        <button onClick={() => { setSelectMode(sessionId); setSelectedExIds(new Set()); setAddingExerciseTo(null); setAddingSupersetTo(null); setAddingToSuperset(null) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+          Select
+        </button>
       </div>
-    ) : (
-      <button onClick={() => { setAddingExerciseTo(sessionId); setExerciseForm(emptyExForm()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
-        + Add exercise
-      </button>
     )
-  )
+  }
 
   // ── Month helpers ──
   const { first: mFirst, year: mYear, month: mMonth } = getMonthBounds(monthOffset)
@@ -550,7 +800,12 @@ export default function GymWidget() {
             {(['month', 'week', 'all'] as View[]).map(v => (
               <button
                 key={v}
-                onClick={() => { setView(v); setWeekOffset(0); setSelectedDate(null); setAddingSession(false); setShowTemplatePicker(false); setSelectedTemplateId(null) }}
+                onClick={() => {
+                  setView(v); setWeekOffset(0); setSelectedDate(null); setAddingSession(false)
+                  setShowTemplatePicker(false); setSelectedTemplateId(null)
+                  setAddingSupersetTo(null); setSupersetRows([emptyExForm(), emptyExForm()])
+                  setSelectMode(null); setSelectedExIds(new Set()); setAddingToSuperset(null)
+                }}
                 className={`px-2.5 py-1 capitalize transition ${view === v ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
               >{v}</button>
             ))}
@@ -663,7 +918,7 @@ export default function GymWidget() {
                   )}
                   <div className="space-y-1">
                     {selectedExercises.length === 0 && <p className="text-xs text-gray-400">No exercises logged.</p>}
-                    {selectedExercises.map(ex => renderExerciseRow(ex))}
+                    {renderExerciseList(selectedSession.id, selectedExercises)}
                   </div>
                   {renderExerciseAdd(selectedSession.id)}
                 </div>
@@ -758,7 +1013,7 @@ export default function GymWidget() {
                     )}
                     {isExpanded && (
                       <div className="px-3 pb-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
-                        {exs.map(ex => renderExerciseRow(ex))}
+                        {renderExerciseList(session.id, exs)}
                         {renderExerciseAdd(session.id)}
                       </div>
                     )}

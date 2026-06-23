@@ -128,6 +128,7 @@ export interface GymExercise {
   weight_kg: number | null
   sets_data: GymSetRow[] | null
   position: number
+  superset_group: string | null
   created_at: string
 }
 
@@ -148,6 +149,7 @@ export interface GymTemplateExercise {
   weight_kg: number | null
   sets_data: GymSetRow[] | null
   position: number
+  superset_group: string | null
 }
 
 export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'
