@@ -114,6 +114,11 @@ export interface GymSession {
   created_at: string
 }
 
+export interface GymSetRow {
+  reps: number | null
+  weight_kg: number | null
+}
+
 export interface GymExercise {
   id: string
   session_id: string
@@ -121,6 +126,7 @@ export interface GymExercise {
   sets: number | null
   reps: number | null
   weight_kg: number | null
+  sets_data: GymSetRow[] | null
   position: number
   created_at: string
 }
@@ -140,6 +146,7 @@ export interface GymTemplateExercise {
   sets: number | null
   reps: number | null
   weight_kg: number | null
+  sets_data: GymSetRow[] | null
   position: number
 }
 
