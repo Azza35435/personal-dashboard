@@ -55,6 +55,10 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **Slide-in panel** (month): coloured left stripe, workout type, date/duration, full exercise list (sets×reps weight), "Save template" + "Delete", inline "+ Add exercise" form.
 - **Week/All session cards**: coloured left border (3px). Hover shows "template" and "×". Expand for exercise list.
 - **Accent colour picker**: ⚙ gear icon → swatch panel for widget border only. `localStorage` key `gym_widget_border`. Default `border-l-blue-400`.
+- **Exercise drag-and-drop**: pointer-event based (same pattern as TodoWidget). Three drag contexts, all using `elementsFromPoint` with `data-*` attributes and `[!!dragging]` effect dependency with a ref to avoid stale closures:
+  - **Outer drag** (`exDragging`): `⠿` handle on each `ExListItem` (solo exercise or superset group). Reorders at the group level; persists via sequential `position` updates. Blue dashed gap spacer at `overIndex`; dragged item goes `opacity-30`. Drop zone `div` at end of list enables "append to bottom".
+  - **Intra-superset drag** (`superDragging`): `⠿` handle on each exercise inside a superset (`data-intra-ex-index`, `data-intra-group-id`). Reorders within the group by reassigning the group's existing position slots. Drag-out: once cursor leaves the superset container (`data-superset-group` not in `elementsFromPoint`), `outerOverIndex` activates and a gap appears in the outer list. On drop, the exercise detaches (`superset_group = null`), is inserted at the outer position, and the group dissolves if only one exercise remains.
+  - **Join superset** (via `exDragging`): when dragging a solo exercise over a superset's content area (`data-superset-group`), `hoverGroupId` is set and the superset highlights with `ring-2 ring-blue-400`. Dropping updates `superset_group` to join. Does not trigger when dragging a superset group (only solo → superset).
 - **`load`/`loadMonthNutrition`** as `useCallback`: both depend on `view` + respective offsets. `loadMonthNutrition` no-ops when not in month view.
 
 #### NutritionWidget (`components/widgets/NutritionWidget.tsx`)
