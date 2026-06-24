@@ -41,6 +41,7 @@ export interface Habit {
   id: string
   name: string
   active: boolean
+  position: number
   created_at: string
 }
 

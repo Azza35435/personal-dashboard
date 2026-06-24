@@ -83,6 +83,24 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **Tried toggle**: circular checkbox on each card flips `tried` in Supabase without opening the card.
 - **`load` as `useCallback`**: no dependencies; called once on mount and after every mutation.
 
+#### HabitTracker (`components/widgets/HabitTracker.tsx`)
+
+Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (installed v3) for line charts.
+
+**Three-row layout:**
+- **Row 1**: Month nav (‹/›, disabled at current month) | Two line charts side-by-side (daily completion % this month + 12-month trend) | Monthly % donut ring (SVG, violet).
+- **Row 2**: Three-column panel in a single card:
+  - *Col 1 (200px)*: Habit list with `⠿` drag handles + delete buttons + inline add form. `data-habit-index` on each row for drag target detection.
+  - *Col 2 (flex-1)*: Horizontally scrollable checkbox grid (habits as rows, days 1–31 as columns, `CELL_W=30px`). Today's column highlighted. Below grid: bar chart (height proportional to daily completion count) + `%` fill strip + text % per day. Bars are full violet when 100%, partial violet when some done, gray when none.
+  - *Col 3 (184px)*: Horizontal progress bars per habit showing % of elapsed days completed. Aligns row-for-row with Col 1.
+- **Row 3**: Weekly donut rings (one per calendar week of the month, Mon–Sun split).
+
+**Drag-to-reorder** (same pointer-event pattern as TodoWidget): `dragging` + `draggingRef` + `habitsRef`. Gap spacer rendered at `overIndex` in all three columns via `Fragment key={h.id}`. Effect dep `[!!dragging]`. Persists `position` to Supabase on drop.
+
+**Data**: `habits` (active, ordered by position then created_at) + `habit_completions` for the viewed month. Completions keyed as `${habit_id}:${day}`. Multi-month trend loaded separately on mount.
+
+**Home dashboard widget** (`components/dashboard/HabitsWidget.tsx`): Today's checkboxes + small monthly % donut + "Full tracker →" link to `/habits`.
+
 #### CurricularsWidget (`components/widgets/CurricularsWidget.tsx`)
 
 - **Purpose**: tracks life areas / co-curriculars (e.g. New Property Group, D Swimming). Lives at `/curriculars`.
@@ -107,7 +125,7 @@ Five lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
 
 - **`HeroWidget`**: Live ticking clock (1s interval), greeting by hour (Good morning/afternoon/evening/night), Melbourne location. Violet gradient background.
 - **`QuoteWidget`**: 36 curated quotes, one per day (`getDayOfYear % 36`). Amber gradient. No external API.
-- **`HabitsWidget`**: Active habits from `habits` table + today's `habit_completions`. Toggle completion (insert/delete). Progress bar.
+- **`HabitsWidget`**: Today's habit checkboxes + monthly % donut ring (computed from month-to-date completions). Links to `/habits` full tracker.
 - **`TodayScheduleWidget`**: Fetches `/api/calendar` for today's date range. Shows unauthenticated state with "Connect Calendar" button. Uses `useSession` from next-auth.
 - **`PriorityTodosWidget`**: Todos where `priority = 'high'` OR `due_date = today`, not completed. Toggle-complete removes from list. Shows due-date badge.
 
@@ -163,6 +181,11 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 ### Database schema
 
 Seventeen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `cookbook_recipes`, `dashboard_layout`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+
+**`habits`** has a `position INTEGER NOT NULL DEFAULT 0` column for drag-to-reorder. Run this migration if not already applied:
+```sql
+ALTER TABLE habits ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;
+```
 
 **`dashboard_layout`**: stores bento-grid widget positions for `app/page.tsx`. One row per widget, upserted on drag/resize. Migration SQL:
 ```sql
