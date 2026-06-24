@@ -146,7 +146,7 @@ Calendar API error messages include the HTTP status and Google's response body (
 
 Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
-**Design system (light minimal, as of 2026-06-22):**
+**Design system (light minimal, as of 2026-06-25):**
 - Widget outer: `bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded shadow-sm` + `border-l-2 border-l-{accent}` per widget area
 - Inner cards/panels: `bg-gray-50 dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-700`
 - Inputs: `bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded placeholder-gray-400`
@@ -154,8 +154,9 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 - Section labels: `text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500`
 - Color use: **semantic only** — red = danger/over-budget, green = done, yellow = warning. No decorative color.
 - Left border accent (2px) per widget area identifies each widget type. Accents: emerald=NetWorth, teal=Accounts, amber=Income/Cookbook, blue=Gym/Nutrition, violet=Habits/Curriculars, slate=Notes, rose=Todo.
+- **Dashboard page exception**: `app/page.tsx` uses its own soft gradient background (`from-[#faf9f7] to-[#f0edf8]` light / `from-gray-950 to-[#1a1525]` dark) instead of the `BackgroundTheme` body background. Dashboard widget cards use `rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)]` for a softer Dribbble-inspired look.
 
-**Background**: `BackgroundTheme.tsx` shifts the body background from near-black at night to near-white during the day (Melbourne sunrise/sunset). It also adds/removes the `dark` class on `<html>`, so all `dark:` Tailwind variants respond automatically.
+**Background**: `BackgroundTheme.tsx` shifts the body background from near-black at night to near-white during the day (Melbourne sunrise/sunset). It also adds/removes the `dark` class on `<html>`, so all `dark:` Tailwind variants respond automatically. (The `/` dashboard overrides this with its own gradient.)
 
 **UI history**: Previous designs are saved in `ui-snapshots/`. The original colorful bubble design is at `ui-snapshots/2026-06-22-colorful-bubbles/` with a README explaining how to restore it.
 

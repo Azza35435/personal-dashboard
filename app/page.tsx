@@ -27,13 +27,6 @@ const DEFAULT_LAYOUT: LayoutItem[] = [
   { i: 'todos',    x: 8, y: 3, w: 4, h: 6, minW: 3, minH: 3 },
 ]
 
-const WIDGET_LABELS: Record<string, string> = {
-  hero: 'Greeting',
-  quote: 'Daily Quote',
-  schedule: "Today's Schedule",
-  habits: 'Habits',
-  todos: 'Priority Tasks',
-}
 
 function WidgetShell({ id, children, onRemove }: { id: string; children: React.ReactNode; onRemove?: () => void }) {
   return (
