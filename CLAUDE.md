@@ -20,7 +20,12 @@ No test suite is configured yet.
 
 ## Architecture
 
-**Single-page dashboard** (`app/page.tsx`) — a `'use client'` page with a `WeekCalendar` taking the main area and `TodoWidget` in a fixed `w-80` right sidebar. All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
+**Two main entry points:**
+
+- **`app/page.tsx`** — Home dashboard: bento-grid layout using `react-grid-layout` v2.2.3. Five widgets (Hero, Quote, Today's Schedule, Habits, Priority Todos) arranged in a drag-resizable grid. Layout persisted to Supabase `dashboard_layout` table. Widget components live in `components/dashboard/`.
+- **`app/schedule/page.tsx`** — Schedule & Tasks: the original home layout with `WeekCalendar` + `TodoWidget` sidebar.
+
+All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
 
 ### Data flow
 
@@ -96,6 +101,25 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - Shows a "Disconnect" button when authenticated to allow signing out and re-authenticating (needed if scope changes).
 - **Error surfacing**: `calError` state captures any non-array API response and displays a red banner above the grid. Errors were previously silent (empty calendar with no indication of failure).
 
+### Dashboard widgets (`components/dashboard/`)
+
+Five lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
+
+- **`HeroWidget`**: Live ticking clock (1s interval), greeting by hour (Good morning/afternoon/evening/night), Melbourne location. Violet gradient background.
+- **`QuoteWidget`**: 36 curated quotes, one per day (`getDayOfYear % 36`). Amber gradient. No external API.
+- **`HabitsWidget`**: Active habits from `habits` table + today's `habit_completions`. Toggle completion (insert/delete). Progress bar.
+- **`TodayScheduleWidget`**: Fetches `/api/calendar` for today's date range. Shows unauthenticated state with "Connect Calendar" button. Uses `useSession` from next-auth.
+- **`PriorityTodosWidget`**: Todos where `priority = 'high'` OR `due_date = today`, not completed. Toggle-complete removes from list. Shows due-date badge.
+
+Each widget is a self-contained card with `rounded-2xl shadow` styling, `overflow-hidden`, and `flex flex-col` for header + scrollable body.
+
+The bento grid in `app/page.tsx`:
+- Uses `react-grid-layout` v2 (`GridLayout` default export). In v2, `cols`/`rowHeight`/`margin` go in `gridConfig`, `draggableHandle` goes in `dragConfig.handle`, `resizeHandles` goes in `resizeConfig.handles`.
+- Layout persisted to `dashboard_layout` Supabase table (debounced 800ms on `onLayoutChange`).
+- Container width measured via `ResizeObserver` → passed as `width` prop.
+- Drag handle: `.drag-handle` strip at top of each `WidgetShell`.
+- CSS for react-grid-layout is inlined in `app/globals.css` (not imported from node_modules).
+
 ### Google Calendar auth setup checklist
 
 Common failure modes and their fixes (all must be true for sign-in to work):
@@ -137,7 +161,21 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 ### Database schema
 
-Sixteen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `cookbook_recipes`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Seventeen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `cookbook_recipes`, `dashboard_layout`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+
+**`dashboard_layout`**: stores bento-grid widget positions for `app/page.tsx`. One row per widget, upserted on drag/resize. Migration SQL:
+```sql
+CREATE TABLE IF NOT EXISTS dashboard_layout (
+  widget_id TEXT PRIMARY KEY,
+  x INTEGER NOT NULL DEFAULT 0,
+  y INTEGER NOT NULL DEFAULT 0,
+  w INTEGER NOT NULL DEFAULT 4,
+  h INTEGER NOT NULL DEFAULT 4,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE dashboard_layout ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON dashboard_layout FOR ALL USING (true) WITH CHECK (true);
+```
 
 - `todos` has a `position INTEGER NOT NULL DEFAULT 0` column for drag-and-drop ordering within priority groups and unsectioned lists.
 - `sections` has `color TEXT` (nullable hex string, e.g. `#3b82f6`) and `position INTEGER NOT NULL DEFAULT 0` for drag-to-reorder.
