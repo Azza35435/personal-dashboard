@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import type { CalendarEvent } from '@/lib/types'
 
-const HOUR_HEIGHT = 64
 const START_HOUR = 7
 const END_HOUR = 22
 const TOTAL_HOURS = END_HOUR - START_HOUR
@@ -32,7 +31,7 @@ interface EventPos {
   height: number
 }
 
-function getEventPos(event: CalendarEvent, weekDays: Date[]): EventPos | null {
+function getEventPos(event: CalendarEvent, weekDays: Date[], hourHeight: number): EventPos | null {
   if (!event.start.dateTime) return null
   const start = new Date(event.start.dateTime)
   const end = new Date(event.end?.dateTime ?? event.start.dateTime)
@@ -41,8 +40,8 @@ function getEventPos(event: CalendarEvent, weekDays: Date[]): EventPos | null {
   if (startHour >= END_HOUR || endHour <= START_HOUR) return null
   const dayIndex = weekDays.findIndex(d => d.toDateString() === start.toDateString())
   if (dayIndex === -1) return null
-  const top = Math.max(0, (startHour - START_HOUR) * HOUR_HEIGHT)
-  const height = Math.max(28, (Math.min(endHour, END_HOUR) - Math.max(startHour, START_HOUR)) * HOUR_HEIGHT)
+  const top = Math.max(0, (startHour - START_HOUR) * hourHeight)
+  const height = Math.max(20, (Math.min(endHour, END_HOUR) - Math.max(startHour, START_HOUR)) * hourHeight)
   return { dayIndex, top, height }
 }
 
@@ -52,8 +51,9 @@ export default function WeekCalendar() {
   const [loading, setLoading] = useState(false)
   const [calError, setCalError] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
   const timeRef = useRef<HTMLDivElement>(null)
+  const [hourHeight, setHourHeight] = useState(48)
 
   const today = new Date()
 
@@ -96,15 +96,20 @@ export default function WeekCalendar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, weekOffset])
 
-  // Scroll to current time on first load
+  // Measure grid container and compute hourHeight so the grid fills without scrolling
   useEffect(() => {
-    if (weekOffset === 0 && timeRef.current) {
-      timeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [weekOffset, loading])
+    const el = gridRef.current
+    if (!el) return
+    const obs = new ResizeObserver(entries => {
+      const h = entries[0].contentRect.height
+      if (h > 0) setHourHeight(h / TOTAL_HOURS)
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   const now = new Date()
-  const currentTimeTop = (now.getHours() + now.getMinutes() / 60 - START_HOUR) * HOUR_HEIGHT
+  const currentTimeTop = (now.getHours() + now.getMinutes() / 60 - START_HOUR) * hourHeight
   const isCurrentWeek = weekOffset === 0
 
   const monthLabel = weekDays[0].getMonth() === weekDays[6].getMonth()
@@ -187,21 +192,21 @@ export default function WeekCalendar() {
         </div>
       )}
 
-      {/* Scrollable grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      {/* Grid — fills remaining space, no scroll */}
+      <div ref={gridRef} className="flex-1 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
             Loading events…
           </div>
         ) : (
-          <div className="flex" style={{ height: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}>
+          <div className="flex h-full">
             {/* Time gutter */}
-            <div className="w-12 flex-shrink-0 relative select-none">
+            <div className="w-12 flex-shrink-0 relative select-none h-full">
               {Array.from({ length: TOTAL_HOURS }, (_, i) => START_HOUR + i).map(hour => (
                 <div
                   key={hour}
                   className="absolute right-2 text-[10px] text-muted-foreground/60"
-                  style={{ top: `${(hour - START_HOUR) * HOUR_HEIGHT - 7}px` }}
+                  style={{ top: `${(hour - START_HOUR) * hourHeight - 7}px` }}
                 >
                   {hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`}
                 </div>
@@ -212,7 +217,7 @@ export default function WeekCalendar() {
             {weekDays.map((day, dayIndex) => {
               const isToday = day.toDateString() === today.toDateString()
               const dayEvents = events
-                .map(e => ({ event: e, pos: getEventPos(e, weekDays) }))
+                .map(e => ({ event: e, pos: getEventPos(e, weekDays, hourHeight) }))
                 .filter(({ pos }) => pos?.dayIndex === dayIndex)
 
               return (
@@ -225,12 +230,12 @@ export default function WeekCalendar() {
                     <div
                       key={i}
                       className="absolute inset-x-0 border-t border-border/30"
-                      style={{ top: `${i * HOUR_HEIGHT}px` }}
+                      style={{ top: `${i * hourHeight}px` }}
                     />
                   ))}
 
                   {/* Current time indicator */}
-                  {isToday && isCurrentWeek && currentTimeTop > 0 && currentTimeTop < TOTAL_HOURS * HOUR_HEIGHT && (
+                  {isToday && isCurrentWeek && currentTimeTop > 0 && currentTimeTop < TOTAL_HOURS * hourHeight && (
                     <div
                       ref={timeRef}
                       className="absolute inset-x-0 z-10 pointer-events-none"
