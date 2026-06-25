@@ -15,7 +15,7 @@ const GRID_CONFIG = {
   cols: 12,
   rowHeight: 72,
   margin: [12, 12] as [number, number],
-  containerPadding: [16, 16] as [number, number],
+  containerPadding: [0, 0] as [number, number],
   maxRows: Infinity,
 }
 
@@ -107,9 +107,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
-      <div ref={containerRef} className="h-full">
-        {width > 0 && (
+    <div ref={containerRef} className="flex-1 overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
+      {width > 0 && (
           <GridLayout
             layout={layout as Layout}
             width={width}
@@ -144,8 +143,7 @@ export default function DashboardPage() {
               </WidgetShell>
             </div>
           </GridLayout>
-        )}
-      </div>
+      )}
     </div>
   )
 }
