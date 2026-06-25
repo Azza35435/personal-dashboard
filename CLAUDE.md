@@ -90,14 +90,20 @@ Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (ins
 **Three-row layout:**
 - **Row 1**: Month nav (‹/›, disabled at current month) | Two line charts side-by-side (daily completion % this month + 12-month trend) | Monthly % donut ring (SVG, violet).
 - **Row 2**: Three-column panel in a single card:
-  - *Col 1 (200px)*: Habit list with `⠿` drag handles + delete buttons + inline add form. `data-habit-index` on each row for drag target detection.
-  - *Col 2 (flex-1)*: Horizontally scrollable checkbox grid (habits as rows, days 1–31 as columns, `CELL_W=30px`). Today's column highlighted. Below grid: bar chart (height proportional to daily completion count) + `%` fill strip + text % per day. Bars are full violet when 100%, partial violet when some done, gray when none.
-  - *Col 3 (184px)*: Horizontal progress bars per habit showing % of elapsed days completed. Aligns row-for-row with Col 1.
+  - *Col 1 (200px)*: Group headers + habit rows with `⠿` drag handles + `···` popovers + per-group inline add forms + "Add group" button at bottom.
+  - *Col 2 (flex-1)*: Horizontally scrollable checkbox grid (habits as rows, days 1–31 as columns, `CELL_W=30px`). Group header rows mirror Col 1. Today's column highlighted. Below grid: bar chart (height proportional to daily completion count) + `%` fill strip + text % per day. Bars are full violet when 100%, partial violet when some done, gray when none.
+  - *Col 3 (184px)*: Horizontal progress bars per habit + group average label. Mirrors Col 1 row-for-row.
 - **Row 3**: Weekly donut rings (one per calendar week of the month, Mon–Sun split).
 
-**Drag-to-reorder** (same pointer-event pattern as TodoWidget): `dragging` + `draggingRef` + `habitsRef`. Gap spacer rendered at `overIndex` in all three columns via `Fragment key={h.id}`. Effect dep `[!!dragging]`. Persists `position` to Supabase on drop.
+**Groups**: Habits belong to named groups (`habit_groups` table) via `habits.group_id`. A permanent virtual "General" group catches ungrouped habits (`group_id = null`). `sections` flat array = ordered named groups + General sentinel — iterated identically in all three columns for alignment. `GRP_H = 26` for group header rows, `ROW_H = 36` for habit rows, `HDR_H = 30` for column headers. `GENERAL_ATTR = '__general__'` sentinel serialises `null` group_id in data attributes via `gAttr()`/`attrToG()` helpers.
 
-**Data**: `habits` (active, ordered by position then created_at) + `habit_completions` for the viewed month. Completions keyed as `${habit_id}:${day}`. Multi-month trend loaded separately on mount.
+**Two drag systems** (pointer-event based, `[!!dragging]` effect dep, ref to avoid stale closures):
+- **Habit drag** (`habitDrag`/`habitDragRef`): `data-hdrop-gid` + `data-hdrop-idx` on every habit row in all 3 columns. Supports cross-group drops — removes from source group, inserts at dest at `overIndex`, persists `position` + `group_id`.
+- **Group drag** (`groupDrag`/`groupDragRef`): `⠿` on group header rows in Col 1. `data-gdrop-idx` on headers. Reorders named groups only; persists `position` to `habit_groups`.
+
+**Popovers**: `···` on habit rows → group picker (immediate reassign) + delete. `···` on group headers → rename input + delete. Delete group with habits → move-or-delete confirmation (`DeleteConfirm` state) with destination picker + "Also delete all habits" checkbox.
+
+**Data**: `habit_groups` (ordered by position) + `habits` (active, ordered by position then created_at) + `habit_completions` for the viewed month. Completions keyed as `${habit_id}:${day}`. Multi-month trend loaded separately on mount. `load` depends on `[startDate, endDate]`.
 
 **Home dashboard widget** (`components/dashboard/HabitsWidget.tsx`): Today's checkboxes + small monthly % donut + "Full tracker →" link to `/habits`.
 
@@ -134,7 +140,7 @@ Each widget is a self-contained card with `rounded-2xl shadow` styling, `overflo
 The bento grid in `app/page.tsx`:
 - Uses `react-grid-layout` v2 (`GridLayout` default export). In v2, `cols`/`rowHeight`/`margin` go in `gridConfig`, `draggableHandle` goes in `dragConfig.handle`, `resizeHandles` goes in `resizeConfig.handles`.
 - Layout persisted to `dashboard_layout` Supabase table (debounced 800ms on `onLayoutChange`).
-- Container width measured via `ResizeObserver` → passed as `width` prop.
+- Container width measured via `ResizeObserver` on the outer `flex-1` div (NOT an inner wrapper) → passed as `width` prop. Must be on the flex item itself to get the correct available width.
 - Drag handle: `.drag-handle` strip at top of each `WidgetShell`.
 - CSS for react-grid-layout is inlined in `app/globals.css` (not imported from node_modules).
 
@@ -149,6 +155,7 @@ Common failure modes and their fixes (all must be true for sign-in to work):
 5. **Test user email added and saved** — in OAuth consent screen → Test users, type email then press Enter before clicking Save.
 6. **`NEXTAUTH_URL` set to stable production URL** — not a preview deployment URL.
 7. **Stale token / "Failed to fetch calendar list"** — if the calendar shows this error after signing in, the session token was issued before scopes were fully configured. Fix: click **Disconnect** in the calendar widget, then sign in again. The `prompt: consent` in `authOptions` forces Google to re-issue a fresh token with all current scopes.
+8. **403 insufficient scopes after reconnecting / app not in Google permissions** — the NextAuth JWT cookie persists the old token even after "Disconnect". Full fix: (a) clear all cookies for the Vercel domain in browser DevTools → Application → Cookies, OR go to `https://myaccount.google.com/permissions`, find the app and click **Remove Access**, then sign in fresh. Simply clicking Disconnect in the widget is not enough when the token is deeply stale or was issued without the calendar scope.
 
 Debug endpoint: `GET /api/debug-auth` returns which env vars are set and the exact `redirect_uri` being sent to Google.
 Custom error page: `app/auth/error/page.tsx` shows the actual NextAuth error code (configured via `pages: { error: '/auth/error' }` in `authOptions`).
@@ -182,9 +189,18 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 Seventeen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `cookbook_recipes`, `dashboard_layout`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
-**`habits`** has a `position INTEGER NOT NULL DEFAULT 0` column for drag-to-reorder. Run this migration if not already applied:
+**`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
 ALTER TABLE habits ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE habits ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES habit_groups(id) ON DELETE SET NULL;
+CREATE TABLE IF NOT EXISTS habit_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE habit_groups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON habit_groups FOR ALL USING (true) WITH CHECK (true);
 ```
 
 **`dashboard_layout`**: stores bento-grid widget positions for `app/page.tsx`. One row per widget, upserted on drag/resize. Migration SQL:
