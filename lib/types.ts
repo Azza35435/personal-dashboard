@@ -37,11 +37,19 @@ export interface Note {
   updated_at: string
 }
 
+export interface HabitGroup {
+  id: string
+  name: string
+  position: number
+  created_at: string
+}
+
 export interface Habit {
   id: string
   name: string
   active: boolean
   position: number
+  group_id: string | null
   created_at: string
 }
 
