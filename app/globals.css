@@ -2,6 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.animate-pin-shake { animation: pin-shake 0.4s ease-in-out; }
+
 /* react-grid-layout */
 .react-grid-layout { position: relative; }
 .react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; }
