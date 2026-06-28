@@ -139,6 +139,9 @@ export default function FinanceLock({ children }: { children: ReactNode }) {
     if (hash && sessionStorage.getItem(SESSION_KEY) !== '1') {
       setLocked(true)
     }
+    return () => {
+      sessionStorage.removeItem(SESSION_KEY)
+    }
   }, [])
 
   function triggerError(msg: string, then?: () => void) {
