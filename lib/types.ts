@@ -161,6 +161,26 @@ export interface GymTemplateExercise {
   superset_group: string | null
 }
 
+export interface AppleHealthLog {
+  date: string
+  steps: number | null
+  active_energy_kcal: number | null
+  resting_hr: number | null
+  hrv_ms: number | null
+  sleep_total_min: number | null
+  sleep_deep_min: number | null
+  sleep_rem_min: number | null
+  sleep_core_min: number | null
+  sleep_awake_min: number | null
+  blood_oxygen_pct: number | null
+  respiratory_rate: number | null
+  vo2_max: number | null
+  exercise_min: number | null
+  stand_hours: number | null
+  weight_kg: number | null
+  updated_at: string
+}
+
 export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 
 export interface CookbookRecipe {

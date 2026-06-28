@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/schedule', label: 'Schedule & Tasks', icon: '📅' },
   { href: '/finance', label: 'Finance', icon: '💰' },
   { href: '/health', label: 'Health', icon: '💪' },
+  { href: '/apple-health', label: 'Apple Health', icon: '♥' },
   { href: '/habits', label: 'Habits', icon: '✓' },
   { href: '/notes', label: 'Notes', icon: '📝' },
   { href: '/curriculars', label: 'Curriculars', icon: '🎓' },
