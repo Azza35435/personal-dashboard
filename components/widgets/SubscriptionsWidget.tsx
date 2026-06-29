@@ -578,7 +578,7 @@ export default function SubscriptionsWidget() {
             {autoSubs.length > 0 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">🔄 Subscriptions</p>
-                <div className="space-y-2">{renderRows(autoSubs)}</div>
+                <div className="space-y-2">{renderRows(autoSubs, true)}</div>
               </div>
             )}
 
