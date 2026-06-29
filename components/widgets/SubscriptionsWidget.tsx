@@ -8,6 +8,7 @@ import type { Subscription, BillingCycle, SubscriptionCategory, Curricular } fro
 
 function toMonthly(amount: number, cycle: BillingCycle): number {
   if (cycle === 'monthly') return amount
+  if (cycle === 'fortnightly') return (amount * 26) / 12
   if (cycle === 'yearly') return amount / 12
   if (cycle === 'weekly') return (amount * 52) / 12
   return 0
@@ -29,6 +30,7 @@ function fmtDate(dateStr: string) {
 
 const CYCLE_LABEL: Record<BillingCycle, string> = {
   monthly: '/mo',
+  fortnightly: '/fn',
   yearly: '/yr',
   weekly: '/wk',
   'one-off': '',
@@ -183,7 +185,7 @@ export default function SubscriptionsWidget() {
 
           {/* Cycle */}
           <div className="flex gap-1 mt-3">
-            {(['monthly', 'yearly', 'weekly', 'one-off'] as BillingCycle[]).map(c => (
+            {(['monthly', 'fortnightly', 'yearly', 'weekly', 'one-off'] as BillingCycle[]).map(c => (
               <button
                 key={c}
                 onClick={() => setCycle(c)}

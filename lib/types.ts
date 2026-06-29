@@ -161,7 +161,7 @@ export interface GymTemplateExercise {
   superset_group: string | null
 }
 
-export type BillingCycle = 'monthly' | 'yearly' | 'weekly' | 'one-off'
+export type BillingCycle = 'monthly' | 'fortnightly' | 'yearly' | 'weekly' | 'one-off'
 export type SubscriptionCategory = 'personal' | 'work' | 'study'
 
 export interface Subscription {
