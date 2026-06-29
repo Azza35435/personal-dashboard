@@ -161,6 +161,22 @@ export interface GymTemplateExercise {
   superset_group: string | null
 }
 
+export type BillingCycle = 'monthly' | 'yearly' | 'weekly' | 'one-off'
+export type SubscriptionCategory = 'personal' | 'work' | 'study'
+
+export interface Subscription {
+  id: string
+  name: string
+  amount: number
+  billing_cycle: BillingCycle
+  next_payment_date: string | null
+  category: SubscriptionCategory
+  curricular_id: string | null
+  notes: string | null
+  active: boolean
+  created_at: string
+}
+
 export interface CurricularDeadline {
   id: string
   curricular_id: string
