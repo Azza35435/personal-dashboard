@@ -20,10 +20,18 @@ No test suite is configured yet.
 
 ## Architecture
 
-**Two main entry points:**
+**Main entry points:**
 
 - **`app/page.tsx`** — Home dashboard: bento-grid layout using `react-grid-layout` v2.2.3. Five widgets (Hero, Quote, Today's Schedule, Habits, Priority Todos) arranged in a drag-resizable grid. Layout persisted to Supabase `dashboard_layout` table. Widget components live in `components/dashboard/`.
 - **`app/schedule/page.tsx`** — Schedule & Tasks: the original home layout with `WeekCalendar` + `TodoWidget` sidebar.
+- **`app/finance/page.tsx`** — Finance: NetWorthWidget + AccountsWidget + IncomeWidget in a 3-column grid, wrapped in `FinanceLock`. Below the grid (full-width `col-span-full`): `SubscriptionsWidget`.
+- **`app/curriculars/page.tsx`** — Curriculars: CurricularsWidget with per-curricular tasks, deadlines, metrics, notes, links. Deadlines tab shows DeadlinesCalendar.
+- **`app/deadlines/page.tsx`** — Standalone deadlines calendar (DeadlinesCalendar with no prop — fetches its own data). Linked from sidebar.
+- **`app/habits/page.tsx`** — Full-page habit tracker (HabitTracker).
+- **`app/health/page.tsx`** — Health: GymWidget + NutritionWidget + CookbookWidget + AppleHealthWidget.
+- **`app/apple-health/page.tsx`** — Apple Health full tracker (AppleHealthTracker).
+
+**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Notes, Curriculars, Deadlines.
 
 All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
 
@@ -110,12 +118,49 @@ Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (ins
 #### CurricularsWidget (`components/widgets/CurricularsWidget.tsx`)
 
 - **Purpose**: tracks life areas / co-curriculars (e.g. New Property Group, D Swimming). Lives at `/curriculars`.
-- **Tab bar**: each curricular is a tab. Switching tabs auto-saves the current note before loading the new curricular's content.
+- **Tab bar**: `📅 Deadlines` tab (sentinel `DEADLINES_TAB = '__deadlines__'`) always first, then one tab per curricular. Switching tabs auto-saves the current note before loading the new curricular's content.
+- **Edit curricular**: ✎ Edit button in the Tasks section header → inline form to rename and change colour (colour picker circle). Saving also updates the linked section's colour.
 - **Todo link**: each curricular can be linked to exactly one todo section via `sections.curricular_id`. Todos from that section appear in the curricular's Tasks panel. Adding a todo in the curricular view inserts it into the linked section — it also appears in the TodoWidget's sections view. When adding a new curricular you choose "Create new section" (creates a fresh section) or "Link existing section" (picks from unlinked sections). Deleting a curricular unlinks (does not delete) its section.
+- **Deadlines**: per-curricular deadlines (`curricular_deadlines` table). Each deadline has title, module label, due date, priority. Adding a deadline auto-creates a linked todo in the curricular's section (if linked) — `todo_id` stored on the deadline row. Toggling/deleting a deadline syncs the linked todo. Past deadlines show red bg; completed ones stay greyed out.
+- **Deadlines tab**: when `selectedId === DEADLINES_TAB`, renders `<DeadlinesCalendar curriculars={curriculars} />` (holistic view across all curriculars).
 - **Metrics**: editable key-value pairs per curricular (`curricular_metrics` table). Unit can be `$`, `hrs`, or none. Click a value to edit inline.
 - **Notes**: single auto-saving textarea per curricular (`curricular_notes` table, `curricular_id` is PK). Saves on blur and on tab change.
 - **Links**: list of (title, URL) pairs (`curricular_links` table). URLs auto-prefixed with `https://` if missing.
 - **`load` as `useCallback`**: depends on `selectedId`; the `useEffect` depends on `load`, so switching tabs automatically triggers a re-fetch.
+
+#### DeadlinesCalendar (`components/widgets/DeadlinesCalendar.tsx`)
+
+- **Shared component** used in two places: embedded in CurricularsWidget's Deadlines tab (receives `curriculars` prop) and standalone at `/deadlines` (fetches its own curriculars).
+- **Two views**: `agenda` (default) and `month`. Toggle in header.
+- **Agenda view**: groups = Overdue (red), This week (violet), Next week (gray), Later (gray), Completed (gray). Each group shows count.
+- **Month view**: calendar grid Mon–Sun, day cells show up to 2 coloured chips (curricular colour + 33% opacity bg), `+N` overflow. Click day → selected day detail panel below grid. Month ‹/› nav; forward disabled at `monthOffset >= 0`. Today: violet circle on date number.
+- **DeadlineChip**: curricular colour dot, title, module, priority dot (red/amber/green), date. Past = red border; completed = grey + strikethrough.
+- **Props**: `curriculars?: Curricular[]` — if provided, uses them directly; otherwise fetches from Supabase.
+
+#### IncomeWidget (`components/widgets/IncomeWidget.tsx`)
+
+- **Billing cycles**: supports `monthly` and `fortnightly`. Toggle shown in add form and edit mode.
+- **Monthly total**: fortnightly amounts converted via `amount × 26 / 12`. Header shows total `/mo` and `/fn` (fortnightly equivalent). Each fortnightly stream shows entered amount `/fn` + monthly equivalent below.
+- **`billing_cycle`** column required on `income_streams` table (`TEXT NOT NULL DEFAULT 'monthly'`).
+
+#### SubscriptionsWidget (`components/widgets/SubscriptionsWidget.tsx`)
+
+- **Location**: full-width row below NetWorth/Accounts/Income on `/finance` page (`col-span-full` in the FinanceLock grid).
+- **Widget renamed** to "Payments" in the UI.
+- **Two payment types**:
+  - `subscription` (🔄) — auto-charged. Shows next payment date with urgency colouring (red ≤3 days, amber ≤7).
+  - `manual` (✋) — user must action. Same urgency colouring. Has a green ✓ "Mark paid" button on hover.
+- **Manual payment sub-types**: `is_recurring` (Recurring vs One-off).
+  - **Recurring manual** (e.g. car rego): ✓ Mark paid → inline confirm-next-date prompt pre-filled via `advanceDate()` (adds 1 cycle). User can adjust before confirming. Saves updated `next_payment_date`.
+  - **One-off manual**: ✓ Mark paid → sets `paid = true`, moves to **Paid** section at bottom. "Clear paid" button restores.
+- **Subscriptions** also have ✓ Mark paid to advance their next_payment_date (same confirm prompt).
+- **Three sections** in left panel: 🔄 Subscriptions | ✋ Manual payments | ✓ Paid.
+- **Right panel**: category breakdown (Personal/Work/Study) with monthly subtotals. Grand total + yearly equivalent. Yearly subs show full amount on card + ÷12 in totals. One-off amounts excluded from monthly total.
+- **Category**: Personal / Work / Study. Work/Study can optionally link to a curricular.
+- **Billing cycles**: monthly / fortnightly / yearly / weekly / one-off (one-off auto-set for non-recurring manual).
+- **Edit**: hover row → ✎ opens inline edit form (same fields as add).
+- **`advanceDate(dateStr, cycle)`** helper: adds 1 month/fortnight/week/year to given date.
+- **`toMonthly(amount, cycle)`** helper: converts any cycle to monthly equivalent.
 
 #### WeekCalendar (`components/widgets/WeekCalendar.tsx`)
 
@@ -163,7 +208,7 @@ Calendar API error messages include the HTTP status and Google's response body (
 
 ### Shared utilities
 
-- `lib/types.ts` — all TypeScript interfaces (`Account`, `Todo`, `Habit`, `Section`, etc.) and union types (`AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`)
+- `lib/types.ts` — all TypeScript interfaces and union types including: `Account`, `Todo`, `Habit`, `Section`, `Curricular`, `CurricularDeadline`, `Subscription`, `IncomeStream`, `AppleHealthLog`, etc. Union types: `AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`, `BillingCycle`, `SubscriptionCategory`.
 - `lib/utils.ts` — `cn()` (clsx + tailwind-merge), `formatCurrency()` (AUD, `en-AU`), `formatDate()`, `formatTime()`, `isToday()`, `isPast()`
 - `types/next-auth.d.ts` — module augmentation to add `accessToken?: string` to the `Session` type
 
@@ -187,7 +232,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 ### Database schema
 
-Seventeen Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `cookbook_recipes`, `dashboard_layout`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Twenty-one Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 **`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
@@ -311,6 +356,41 @@ CREATE POLICY "Allow all" ON curriculars FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_metrics FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_notes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_links FOR ALL USING (true) WITH CHECK (true);
+-- Curricular deadlines (added for /curriculars Deadlines tab and /deadlines page):
+CREATE TABLE IF NOT EXISTS curricular_deadlines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curricular_id UUID NOT NULL REFERENCES curriculars(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  module TEXT,
+  due_date DATE NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'medium',
+  completed BOOLEAN NOT NULL DEFAULT false,
+  todo_id UUID REFERENCES todos(id) ON DELETE SET NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE curricular_deadlines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON curricular_deadlines FOR ALL USING (true) WITH CHECK (true);
+-- Subscriptions/Payments widget (added for /finance page):
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+  next_payment_date DATE,
+  category TEXT NOT NULL DEFAULT 'personal',
+  curricular_id UUID REFERENCES curriculars(id) ON DELETE SET NULL,
+  notes TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  payment_type TEXT NOT NULL DEFAULT 'subscription',
+  is_recurring BOOLEAN NOT NULL DEFAULT true,
+  paid BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON subscriptions FOR ALL USING (true) WITH CHECK (true);
+-- Fortnightly income (added to income_streams):
+ALTER TABLE income_streams ADD COLUMN IF NOT EXISTS billing_cycle TEXT NOT NULL DEFAULT 'monthly';
 ```
 
 ## Environment variables
