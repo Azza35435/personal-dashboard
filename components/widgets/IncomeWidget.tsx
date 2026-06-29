@@ -62,6 +62,7 @@ export default function IncomeWidget() {
   }
 
   const total = streams.reduce((s, i) => s + i.amount, 0)
+  const totalFn = total * 12 / 26
 
   return (
     <div className="rounded p-5 flex flex-col gap-3 h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-amber-400 shadow-sm text-gray-900 dark:text-gray-100">
@@ -69,6 +70,7 @@ export default function IncomeWidget() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Income</p>
           <p className="text-2xl font-bold">{formatCurrency(total)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500">/mo</span></p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">{formatCurrency(totalFn)}<span className="text-xs">/fn</span></p>
         </div>
         <button
           onClick={() => setAdding(!adding)}
@@ -150,12 +152,15 @@ export default function IncomeWidget() {
                     </div>
                   ) : (
                     <>
-                      <button
-                        onClick={() => { setEditing(stream.id); setEditValue(String(stream.amount)) }}
-                        className="font-bold text-sm"
-                      >
-                        {formatCurrency(stream.amount)}
-                      </button>
+                      <div className="text-right">
+                        <button
+                          onClick={() => { setEditing(stream.id); setEditValue(String(stream.amount)) }}
+                          className="font-bold text-sm block"
+                        >
+                          {formatCurrency(stream.amount)}<span className="text-xs font-normal text-gray-400">/mo</span>
+                        </button>
+                        <p className="text-xs text-gray-400">{formatCurrency(stream.amount * 12 / 26)}/fn</p>
+                      </div>
                       <button
                         onClick={() => deleteStream(stream.id)}
                         className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition"
