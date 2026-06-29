@@ -28,6 +28,9 @@ function fmtDate(dateStr: string) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
 }
 
+const CYCLES: BillingCycle[] = ['monthly', 'fortnightly', 'yearly', 'weekly', 'one-off']
+const CATS: SubscriptionCategory[] = ['personal', 'work', 'study']
+
 const CYCLE_LABEL: Record<BillingCycle, string> = {
   monthly: '/mo',
   fortnightly: '/fn',
@@ -48,7 +51,132 @@ const CAT_COLOR: Record<SubscriptionCategory, string> = {
   study: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
 }
 
-// ── component ──────────────────────────────────────────────────────────────
+// ── shared form UI ─────────────────────────────────────────────────────────
+
+interface SubFormProps {
+  name: string; setName: (v: string) => void
+  amount: string; setAmount: (v: string) => void
+  cycle: BillingCycle; setCycle: (v: BillingCycle) => void
+  nextDate: string; setNextDate: (v: string) => void
+  category: SubscriptionCategory; setCategory: (v: SubscriptionCategory) => void
+  curricularId: string; setCurricularId: (v: string) => void
+  notes: string; setNotes: (v: string) => void
+  curriculars: Curricular[]
+  onSave: () => void
+  onCancel: () => void
+  saveLabel: string
+  autoFocus?: boolean
+}
+
+function SubForm({
+  name, setName, amount, setAmount, cycle, setCycle,
+  nextDate, setNextDate, category, setCategory,
+  curricularId, setCurricularId, notes, setNotes,
+  curriculars, onSave, onCancel, saveLabel, autoFocus,
+}: SubFormProps) {
+  return (
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <input
+          autoFocus={autoFocus}
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+          placeholder="Name (e.g. Netflix)"
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
+        <div className="flex gap-1.5 items-center">
+          <span className="text-sm text-gray-500 flex-shrink-0">$</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+            placeholder="Amount"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+          />
+        </div>
+        <input
+          type="date"
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+          value={nextDate}
+          onChange={e => setNextDate(e.target.value)}
+          title="Next payment date"
+        />
+      </div>
+
+      <div className="flex gap-1">
+        {CYCLES.map(c => (
+          <button
+            key={c}
+            onClick={() => setCycle(c)}
+            className={`flex-1 text-xs py-1.5 rounded capitalize transition border ${
+              cycle === c
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white font-medium'
+                : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-1">
+        {CATS.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setCategory(cat)}
+            className={`flex-1 text-xs py-1.5 rounded capitalize transition border ${
+              category === cat
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white font-medium'
+                : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {category !== 'personal' && curriculars.length > 0 && (
+        <select
+          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+          value={curricularId}
+          onChange={e => setCurricularId(e.target.value)}
+        >
+          <option value="">— link to a curricular (optional) —</option>
+          {curriculars.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      )}
+
+      <input
+        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
+        placeholder="Notes (optional)"
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && onSave()}
+      />
+
+      <div className="flex gap-2">
+        <button
+          onClick={onSave}
+          className="flex-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1.5 rounded hover:opacity-90 transition"
+        >
+          {saveLabel}
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── main component ─────────────────────────────────────────────────────────
 
 export default function SubscriptionsWidget() {
   const [subs, setSubs] = useState<Subscription[]>([])
@@ -65,6 +193,16 @@ export default function SubscriptionsWidget() {
   const [curricularId, setCurricularId] = useState('')
   const [notes, setNotes] = useState('')
 
+  // Edit form
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [eName, setEName] = useState('')
+  const [eAmount, setEAmount] = useState('')
+  const [eCycle, setECycle] = useState<BillingCycle>('monthly')
+  const [eNextDate, setENextDate] = useState('')
+  const [eCategory, setECategory] = useState<SubscriptionCategory>('personal')
+  const [eCurricularId, setECurricularId] = useState('')
+  const [eNotes, setENotes] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: s }, { data: c }] = await Promise.all([
@@ -80,23 +218,45 @@ export default function SubscriptionsWidget() {
 
   const curricularById = Object.fromEntries(curriculars.map(c => [c.id, c]))
 
+  function openEdit(s: Subscription) {
+    setEditingId(s.id)
+    setEName(s.name)
+    setEAmount(String(s.amount))
+    setECycle(s.billing_cycle)
+    setENextDate(s.next_payment_date ?? '')
+    setECategory(s.category)
+    setECurricularId(s.curricular_id ?? '')
+    setENotes(s.notes ?? '')
+    setAdding(false)
+  }
+
   const addSub = async () => {
     const n = name.trim()
     const a = parseFloat(amount)
     if (!n || isNaN(a) || a <= 0) return
     await supabase.from('subscriptions').insert({
-      name: n,
-      amount: a,
-      billing_cycle: cycle,
-      next_payment_date: nextDate || null,
-      category,
+      name: n, amount: a, billing_cycle: cycle,
+      next_payment_date: nextDate || null, category,
       curricular_id: (category !== 'personal' && curricularId) ? curricularId : null,
-      notes: notes.trim() || null,
-      active: true,
+      notes: notes.trim() || null, active: true,
     })
     setName(''); setAmount(''); setCycle('monthly'); setNextDate('')
     setCategory('personal'); setCurricularId(''); setNotes('')
     setAdding(false)
+    load()
+  }
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    const a = parseFloat(eAmount)
+    if (!eName.trim() || isNaN(a) || a <= 0) return
+    await supabase.from('subscriptions').update({
+      name: eName.trim(), amount: a, billing_cycle: eCycle,
+      next_payment_date: eNextDate || null, category: eCategory,
+      curricular_id: (eCategory !== 'personal' && eCurricularId) ? eCurricularId : null,
+      notes: eNotes.trim() || null,
+    }).eq('id', editingId)
+    setEditingId(null)
     load()
   }
 
@@ -105,16 +265,14 @@ export default function SubscriptionsWidget() {
     load()
   }
 
-  // totals
   const totalMonthly = subs.reduce((sum, s) => sum + toMonthly(s.amount, s.billing_cycle), 0)
 
-  const byCategory = (['personal', 'work', 'study'] as SubscriptionCategory[]).map(cat => ({
+  const byCategory = CATS.map(cat => ({
     cat,
     items: subs.filter(s => s.category === cat),
     total: subs.filter(s => s.category === cat).reduce((sum, s) => sum + toMonthly(s.amount, s.billing_cycle), 0),
   })).filter(g => g.items.length > 0)
 
-  // upcoming: sorted by next_payment_date, subs without date at bottom
   const upcoming = [...subs].sort((a, b) => {
     if (!a.next_payment_date && !b.next_payment_date) return 0
     if (!a.next_payment_date) return 1
@@ -144,7 +302,7 @@ export default function SubscriptionsWidget() {
           </span>
         </div>
         <button
-          onClick={() => setAdding(p => !p)}
+          onClick={() => { setAdding(p => !p); setEditingId(null) }}
           className="text-xs bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 transition"
         >
           {adding ? 'Cancel' : '+ Add'}
@@ -154,98 +312,20 @@ export default function SubscriptionsWidget() {
       {/* Add form */}
       {adding && (
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <input
-              autoFocus
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-              placeholder="Name (e.g. Netflix)"
-              value={name}
-              onChange={e => setName(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <span className="flex items-center text-sm text-gray-500 px-2">$</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-                placeholder="Amount"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-              />
-            </div>
-            <input
-              type="date"
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-              value={nextDate}
-              onChange={e => setNextDate(e.target.value)}
-              title="Next payment date"
-            />
-          </div>
-
-          {/* Cycle */}
-          <div className="flex gap-1 mt-3">
-            {(['monthly', 'fortnightly', 'yearly', 'weekly', 'one-off'] as BillingCycle[]).map(c => (
-              <button
-                key={c}
-                onClick={() => setCycle(c)}
-                className={`flex-1 text-xs py-1.5 rounded capitalize transition border ${
-                  cycle === c
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white font-medium'
-                    : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-
-          {/* Category */}
-          <div className="flex gap-1 mt-2">
-            {(['personal', 'work', 'study'] as SubscriptionCategory[]).map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`flex-1 text-xs py-1.5 rounded capitalize transition border ${
-                  category === cat
-                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white font-medium'
-                    : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Curricular link (work/study only) */}
-          {category !== 'personal' && curriculars.length > 0 && (
-            <select
-              className="w-full mt-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
-              value={curricularId}
-              onChange={e => setCurricularId(e.target.value)}
-            >
-              <option value="">— link to a curricular (optional) —</option>
-              {curriculars.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Notes */}
-          <input
-            className="w-full mt-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-            placeholder="Notes (optional)"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addSub()}
+          <SubForm
+            name={name} setName={setName}
+            amount={amount} setAmount={setAmount}
+            cycle={cycle} setCycle={setCycle}
+            nextDate={nextDate} setNextDate={setNextDate}
+            category={category} setCategory={setCategory}
+            curricularId={curricularId} setCurricularId={setCurricularId}
+            notes={notes} setNotes={setNotes}
+            curriculars={curriculars}
+            onSave={addSub}
+            onCancel={() => setAdding(false)}
+            saveLabel="Save subscription"
+            autoFocus
           />
-
-          <button
-            onClick={addSub}
-            className="mt-3 w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm py-1.5 rounded hover:opacity-90 transition"
-          >
-            Save subscription
-          </button>
         </div>
       )}
 
@@ -268,6 +348,27 @@ export default function SubscriptionsWidget() {
                   : days <= 7 ? 'text-amber-500 font-medium'
                   : 'text-gray-400'
 
+                if (editingId === s.id) {
+                  return (
+                    <div key={s.id} className="rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-3">
+                      <SubForm
+                        name={eName} setName={setEName}
+                        amount={eAmount} setAmount={setEAmount}
+                        cycle={eCycle} setCycle={setECycle}
+                        nextDate={eNextDate} setNextDate={setENextDate}
+                        category={eCategory} setCategory={setECategory}
+                        curricularId={eCurricularId} setCurricularId={setECurricularId}
+                        notes={eNotes} setNotes={setENotes}
+                        curriculars={curriculars}
+                        onSave={saveEdit}
+                        onCancel={() => setEditingId(null)}
+                        saveLabel="Save changes"
+                        autoFocus
+                      />
+                    </div>
+                  )
+                }
+
                 return (
                   <div
                     key={s.id}
@@ -284,7 +385,9 @@ export default function SubscriptionsWidget() {
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0 text-right">
                       <div>
-                        <p className="text-sm font-semibold tabular-nums">{fmtAUD(s.amount)}<span className="text-xs font-normal text-gray-400">{CYCLE_LABEL[s.billing_cycle]}</span></p>
+                        <p className="text-sm font-semibold tabular-nums">
+                          {fmtAUD(s.amount)}<span className="text-xs font-normal text-gray-400">{CYCLE_LABEL[s.billing_cycle]}</span>
+                        </p>
                         {s.billing_cycle === 'yearly' && (
                           <p className="text-xs text-gray-400">{fmtAUD(s.amount / 12)}/mo</p>
                         )}
@@ -297,12 +400,22 @@ export default function SubscriptionsWidget() {
                           <p className="text-xs text-gray-400">{fmtDate(s.next_payment_date)}</p>
                         </div>
                       )}
-                      <button
-                        onClick={() => deleteSub(s.id)}
-                        className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-sm transition"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+                        <button
+                          onClick={() => openEdit(s)}
+                          className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs transition"
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => deleteSub(s.id)}
+                          className="text-gray-400 hover:text-red-500 text-sm transition leading-none"
+                          title="Delete"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -343,7 +456,6 @@ export default function SubscriptionsWidget() {
                 </div>
               ))}
 
-              {/* Grand total */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total</span>
                 <span className="text-base font-semibold tabular-nums">{fmtAUD(totalMonthly)}<span className="text-xs font-normal text-gray-400">/mo</span></span>
