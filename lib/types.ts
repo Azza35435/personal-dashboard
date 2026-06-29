@@ -161,6 +161,19 @@ export interface GymTemplateExercise {
   superset_group: string | null
 }
 
+export interface CurricularDeadline {
+  id: string
+  curricular_id: string
+  title: string
+  module: string | null
+  due_date: string
+  priority: Priority
+  completed: boolean
+  todo_id: string | null
+  position: number
+  created_at: string
+}
+
 export interface AppleHealthLog {
   date: string
   steps: number | null
