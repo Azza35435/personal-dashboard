@@ -17,6 +17,7 @@ export interface IncomeStream {
   name: string
   category: IncomeCategory
   amount: number
+  billing_cycle: 'monthly' | 'fortnightly'
   destination: AccountGroup
   updated_at: string
 }

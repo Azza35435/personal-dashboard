@@ -18,22 +18,28 @@ const GROUP_LABELS: Record<AccountGroup, string> = {
   business: 'Business',
 }
 
+function toMonthly(amount: number, cycle: 'monthly' | 'fortnightly'): number {
+  return cycle === 'fortnightly' ? (amount * 26) / 12 : amount
+}
+
 export default function IncomeWidget() {
   const [streams, setStreams] = useState<IncomeStream[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [editCycle, setEditCycle] = useState<'monthly' | 'fortnightly'>('monthly')
   const [adding, setAdding] = useState(false)
   const [newStream, setNewStream] = useState({
     name: '',
     category: 'freelance' as IncomeCategory,
     destination: 'personal' as AccountGroup,
     amount: '',
+    billing_cycle: 'monthly' as 'monthly' | 'fortnightly',
   })
 
   const load = () =>
     supabase.from('income_streams').select('*').order('category').then(({ data }) => {
-      setStreams(data ?? [])
+      setStreams((data ?? []) as IncomeStream[])
       setLoading(false)
     })
 
@@ -42,7 +48,11 @@ export default function IncomeWidget() {
   const saveEdit = async (id: string) => {
     const val = parseFloat(editValue)
     if (isNaN(val)) return
-    await supabase.from('income_streams').update({ amount: val, updated_at: new Date().toISOString() }).eq('id', id)
+    await supabase.from('income_streams').update({
+      amount: val,
+      billing_cycle: editCycle,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
     setEditing(null)
     load()
   }
@@ -52,7 +62,7 @@ export default function IncomeWidget() {
     if (!newStream.name || isNaN(amount)) return
     await supabase.from('income_streams').insert({ ...newStream, amount })
     setAdding(false)
-    setNewStream({ name: '', category: 'freelance', destination: 'personal', amount: '' })
+    setNewStream({ name: '', category: 'freelance', destination: 'personal', amount: '', billing_cycle: 'monthly' })
     load()
   }
 
@@ -61,15 +71,15 @@ export default function IncomeWidget() {
     load()
   }
 
-  const total = streams.reduce((s, i) => s + i.amount, 0)
-  const totalFn = total * 12 / 26
+  const totalMonthly = streams.reduce((s, i) => s + toMonthly(i.amount, i.billing_cycle ?? 'monthly'), 0)
+  const totalFn = totalMonthly * 12 / 26
 
   return (
     <div className="rounded p-5 flex flex-col gap-3 h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-amber-400 shadow-sm text-gray-900 dark:text-gray-100">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Income</p>
-          <p className="text-2xl font-bold">{formatCurrency(total)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500">/mo</span></p>
+          <p className="text-2xl font-bold">{formatCurrency(totalMonthly)}<span className="text-sm font-normal text-gray-400 dark:text-gray-500">/mo</span></p>
           <p className="text-sm text-gray-400 dark:text-gray-500">{formatCurrency(totalFn)}<span className="text-xs">/fn</span></p>
         </div>
         <button
@@ -106,13 +116,30 @@ export default function IncomeWidget() {
               {Object.entries(GROUP_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
+          {/* Cycle toggle */}
+          <div className="flex gap-1">
+            {(['monthly', 'fortnightly'] as const).map(c => (
+              <button
+                key={c}
+                onClick={() => setNewStream({ ...newStream, billing_cycle: c })}
+                className={`flex-1 text-xs py-1.5 rounded capitalize transition border ${
+                  newStream.billing_cycle === c
+                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white font-medium'
+                    : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2">
             <input
               className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-1.5 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-              placeholder="Monthly amount"
+              placeholder={`${newStream.billing_cycle === 'fortnightly' ? 'Fortnightly' : 'Monthly'} amount`}
               type="number"
               value={newStream.amount}
               onChange={(e) => setNewStream({ ...newStream, amount: e.target.value })}
+              onKeyDown={e => e.key === 'Enter' && addStream()}
             />
             <button onClick={addStream} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm px-3 py-1.5 rounded transition">Save</button>
           </div>
@@ -129,6 +156,8 @@ export default function IncomeWidget() {
         <div className="space-y-1.5 overflow-y-auto flex-1">
           {streams.map((stream) => {
             const config = CATEGORY_CONFIG[stream.category]
+            const cycle = stream.billing_cycle ?? 'monthly'
+            const monthly = toMonthly(stream.amount, cycle)
             return (
               <div key={stream.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded px-3 py-2 group border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2">
@@ -140,26 +169,45 @@ export default function IncomeWidget() {
                 </div>
                 <div className="flex items-center gap-2">
                   {editing === stream.id ? (
-                    <div className="flex gap-1">
-                      <input
-                        autoFocus
-                        className="w-24 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-right outline-none text-gray-900 dark:text-gray-100"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(stream.id); if (e.key === 'Escape') setEditing(null) }}
-                      />
-                      <button onClick={() => saveEdit(stream.id)} className="text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold px-2 py-1 rounded">✓</button>
+                    <div className="space-y-1.5">
+                      <div className="flex gap-1">
+                        {(['monthly', 'fortnightly'] as const).map(c => (
+                          <button
+                            key={c}
+                            onClick={() => setEditCycle(c)}
+                            className={`flex-1 text-xs py-1 rounded capitalize transition border ${
+                              editCycle === c
+                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white font-medium'
+                                : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500'
+                            }`}
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-1">
+                        <input
+                          autoFocus
+                          className="w-24 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm text-right outline-none text-gray-900 dark:text-gray-100"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(stream.id); if (e.key === 'Escape') setEditing(null) }}
+                        />
+                        <button onClick={() => saveEdit(stream.id)} className="text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold px-2 py-1 rounded">✓</button>
+                      </div>
                     </div>
                   ) : (
                     <>
                       <div className="text-right">
                         <button
-                          onClick={() => { setEditing(stream.id); setEditValue(String(stream.amount)) }}
+                          onClick={() => { setEditing(stream.id); setEditValue(String(stream.amount)); setEditCycle(cycle) }}
                           className="font-bold text-sm block"
                         >
-                          {formatCurrency(stream.amount)}<span className="text-xs font-normal text-gray-400">/mo</span>
+                          {formatCurrency(stream.amount)}<span className="text-xs font-normal text-gray-400">/{cycle === 'fortnightly' ? 'fn' : 'mo'}</span>
                         </button>
-                        <p className="text-xs text-gray-400">{formatCurrency(stream.amount * 12 / 26)}/fn</p>
+                        {cycle === 'fortnightly' && (
+                          <p className="text-xs text-gray-400">{formatCurrency(monthly)}/mo</p>
+                        )}
                       </div>
                       <button
                         onClick={() => deleteStream(stream.id)}
