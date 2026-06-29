@@ -175,6 +175,9 @@ export interface Subscription {
   curricular_id: string | null
   notes: string | null
   active: boolean
+  payment_type: 'subscription' | 'manual'
+  is_recurring: boolean
+  paid: boolean
   created_at: string
 }
 
