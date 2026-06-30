@@ -144,6 +144,7 @@ export default function GymWidget() {
 
   const [editingSessionTitleId, setEditingSessionTitleId] = useState<string | null>(null)
   const [editingSessionTitle, setEditingSessionTitle] = useState('')
+  const [editingColorId, setEditingColorId] = useState<string | null>(null)
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -640,6 +641,13 @@ export default function GymWidget() {
     if (!editingSessionTitle.trim()) return
     await supabase.from('gym_sessions').update({ workout_type: editingSessionTitle.trim() }).eq('id', id)
     setEditingSessionTitleId(null)
+    load()
+  }
+
+  const saveSessionColor = async (id: string, color: string) => {
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, color } : s))
+    setEditingColorId(null)
+    await supabase.from('gym_sessions').update({ color }).eq('id', id)
     load()
   }
 
@@ -1253,7 +1261,12 @@ export default function GymWidget() {
                       {selectedDateSessions.length > 1 && (
                         <button onClick={() => setSelectedSessionId(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">←</button>
                       )}
-                      <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: colorHex(selectedSession.color) }} />
+                      <button
+                        onClick={() => setEditingColorId(id => id === selectedSession.id ? null : selectedSession.id)}
+                        className="w-2.5 self-stretch rounded-full flex-shrink-0 hover:opacity-70 transition"
+                        style={{ backgroundColor: colorHex(selectedSession.color) }}
+                        title="Change colour"
+                      />
                       <div>
                         {editingSessionTitleId === selectedSession.id ? (
                           <input autoFocus className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" value={editingSessionTitle} onChange={e => setEditingSessionTitle(e.target.value)} onBlur={() => saveSessionTitle(selectedSession.id)} onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(selectedSession.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }} />
@@ -1268,6 +1281,9 @@ export default function GymWidget() {
                       <button onClick={() => { deleteSession(selectedSession.id); setSelectedSessionId(null) }} className="text-xs text-red-400 hover:text-red-600 transition">Delete</button>
                     </div>
                   </div>
+                  {editingColorId === selectedSession.id && (
+                    <div>{renderColorPicker(selectedSession.color ?? 'blue', c => saveSessionColor(selectedSession.id, c))}</div>
+                  )}
                   {savingTemplate === selectedSession.id && (
                     <div className="flex gap-2">
                       <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(selectedSession) }} />
@@ -1378,11 +1394,17 @@ export default function GymWidget() {
                             <p className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(session.date)}{session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}{exs.length > 0 ? ` · ${exs.length} exercise${exs.length !== 1 ? 's' : ''}` : ''}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
+                            <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setEditingColorId(id => id === session.id ? null : session.id) }} className="opacity-0 group-hover:opacity-70 hover:!opacity-100 transition w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: hex }} title="Change colour" />
                             <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSavingTemplate(session.id); setTemplateName('') }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition">template</button>
                             <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); deleteSession(session.id) }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none transition">×</button>
                             <span className="text-xs text-gray-400">{isExpanded ? '▴' : '▾'}</span>
                           </div>
                         </div>
+                        {editingColorId === session.id && (
+                          <div className="px-3 pb-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                            {renderColorPicker(session.color ?? 'blue', c => saveSessionColor(session.id, c))}
+                          </div>
+                        )}
                         {savingTemplate === session.id && (
                           <div className="px-3 pb-2 pt-1 flex gap-2 border-t border-gray-200 dark:border-gray-700">
                             <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(session) }} />
@@ -1427,11 +1449,17 @@ export default function GymWidget() {
                                   <p className="text-xs text-gray-400 dark:text-gray-500">{session.duration_minutes ? `${session.duration_minutes} min · ` : ''}{exs.length} exercise{exs.length !== 1 ? 's' : ''}</p>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                  <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setEditingColorId(id => id === session.id ? null : session.id) }} className="opacity-0 group-hover:opacity-70 hover:!opacity-100 transition w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: hex }} title="Change colour" />
                                   <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSavingTemplate(session.id); setTemplateName('') }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition">template</button>
                                   <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); deleteSession(session.id) }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none transition">×</button>
                                   <span className="text-xs text-gray-400">{isExpanded ? '▴' : '▾'}</span>
                                 </div>
                               </div>
+                              {editingColorId === session.id && (
+                                <div className="px-3 pb-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                                  {renderColorPicker(session.color ?? 'blue', c => saveSessionColor(session.id, c))}
+                                </div>
+                              )}
                               {savingTemplate === session.id && (
                                 <div className="px-3 pb-2 pt-1 flex gap-2 border-t border-gray-200 dark:border-gray-700">
                                   <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(session) }} />
