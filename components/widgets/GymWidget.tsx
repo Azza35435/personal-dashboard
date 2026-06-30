@@ -466,7 +466,14 @@ export default function GymWidget() {
     setSessionForm(emptySessionForm())
     setSelectedTemplateId(null)
     setShowTemplatePicker(false)
-    setSelectedSessionId(null) // go back to list after adding
+    // Optimistically insert the new session so the detail panel renders
+    // immediately without waiting for load() to complete.
+    if (view === 'month' && newSess) {
+      setSessions(prev => [...prev, newSess as GymSession])
+      setSelectedSessionId(newSess.id)
+    } else {
+      setSelectedSessionId(null)
+    }
     if (view === 'month') setSelectedDate(date)
     load()
     loadMonthNutrition()
