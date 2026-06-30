@@ -30,8 +30,9 @@ No test suite is configured yet.
 - **`app/habits/page.tsx`** — Full-page habit tracker (HabitTracker).
 - **`app/health/page.tsx`** — Health: GymWidget + NutritionWidget + CookbookWidget + AppleHealthWidget.
 - **`app/apple-health/page.tsx`** — Apple Health full tracker (AppleHealthTracker).
+- **`app/goals/page.tsx`** — Goals tracker (GoalsWidget): monthly / short-term / long-term goals grouped by editable categories, with milestones and a decision journal.
 
-**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Notes, Curriculars, Deadlines.
+**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Goals, Notes, Curriculars, Deadlines.
 
 All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
 
@@ -162,6 +163,24 @@ Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (ins
 - **`advanceDate(dateStr, cycle)`** helper: adds 1 month/fortnight/week/year to given date.
 - **`toMonthly(amount, cycle)`** helper: converts any cycle to monthly equivalent.
 
+#### GoalsWidget (`components/widgets/GoalsWidget.tsx`)
+
+Full-page goals tracker at `/goals`. Dashboard summary at `components/dashboard/GoalsWidget.tsx`.
+
+**Four tabs**: Monthly | Short-term (6-12 mo) | Long-term (5+ yr) | Decisions
+
+**Categories**: Goals are grouped into editable named categories (default: Recreational, Finance, Career, Health) stored in `goal_categories`. Same categories appear in all three horizon tabs. Hover a category header to reveal ✎ (rename) and × (delete) buttons — uses `group/cat` + `group-hover/cat:opacity-60` Tailwind pattern. Rename opens an inline input; delete removes the category row (goals become uncategorised via `ON DELETE SET NULL`).
+
+**Goal fields**: title, `category_id`, `horizon` (`monthly`/`short`/`long`), `target_date` (DATE), `notes`, `month` (YYYY-MM, monthly horizon only), `completed`, `position`. Click a goal card to expand it; expanded view shows notes, editable fields, and milestones.
+
+**Milestones**: checklist items per goal (`goal_milestones` table). Progress bar auto-calculated from `completed / total`. Toggling a milestone optimistically updates local state then persists to Supabase.
+
+**Monthly carry-over**: monthly tab shows goals where `month = currentMonth()` OR (`month < currentMonth()` AND `!completed`). Carried goals show an amber "carried from [Month Year]" badge. Month heading displayed at top of tab (e.g. "July 2026").
+
+**Decisions tab**: standalone dated journal (`goal_decisions` table — `content`, `date`). No link to specific goals. Ordered by date descending.
+
+**`load` as `useCallback`**: depends on `tab`; re-fetches categories, goals for the active horizon, then milestones for all loaded goals.
+
 #### WeekCalendar (`components/widgets/WeekCalendar.tsx`)
 
 - Shows events from **all Google Calendars** (not just primary) by first fetching `calendarList` then parallel-fetching events per calendar in `/api/calendar`.
@@ -172,20 +191,21 @@ Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (ins
 
 ### Dashboard widgets (`components/dashboard/`)
 
-Five lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
+Six lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
 
 - **`HeroWidget`**: Live ticking clock (1s interval), greeting by hour (Good morning/afternoon/evening/night), Melbourne location. Violet gradient background.
 - **`QuoteWidget`**: 36 curated quotes, one per day (`getDayOfYear % 36`). Amber gradient. No external API.
 - **`HabitsWidget`**: Today's habit checkboxes + monthly % donut ring (computed from month-to-date completions). Links to `/habits` full tracker.
 - **`TodayScheduleWidget`**: Fetches `/api/calendar` for today's date range. Shows unauthenticated state with "Connect Calendar" button. Uses `useSession` from next-auth.
 - **`PriorityTodosWidget`**: Todos where `priority = 'high'` OR `due_date = today`, not completed. Toggle-complete removes from list. Shows due-date badge.
+- **`GoalsWidget`** (`components/dashboard/GoalsWidget.tsx`): Monthly goals summary — current month + carried-over incomplete goals, each with a milestone progress bar. Links to `/goals` full tracker.
 
 Each widget is a self-contained card with `rounded-2xl shadow` styling, `overflow-hidden`, and `flex flex-col` for header + scrollable body.
 
 The bento grid in `app/page.tsx`:
 - Uses `react-grid-layout` v2 (`GridLayout` default export). In v2, `cols`/`rowHeight`/`margin` go in `gridConfig`, `draggableHandle` goes in `dragConfig.handle`, `resizeHandles` goes in `resizeConfig.handles`.
 - Layout persisted to `dashboard_layout` Supabase table (debounced 800ms on `onLayoutChange`).
-- Container width measured via `ResizeObserver` on the outer `flex-1` div (NOT an inner wrapper) → passed as `width` prop. Must be on the flex item itself to get the correct available width.
+- Container width measured via `useContainerWidth()` hook exported from `react-grid-layout`. The `mounted` flag prevents the grid rendering at an incorrect width before measurement fires. Do NOT use a manual `ResizeObserver` + `useState(1200)` — this caused the grid to appear narrower than the screen.
 - Drag handle: `.drag-handle` strip at top of each `WidgetShell`.
 - CSS for react-grid-layout is inlined in `app/globals.css` (not imported from node_modules).
 
@@ -232,7 +252,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 ### Database schema
 
-Twenty-one Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Twenty-five Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 **`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
@@ -391,6 +411,49 @@ ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON subscriptions FOR ALL USING (true) WITH CHECK (true);
 -- Fortnightly income (added to income_streams):
 ALTER TABLE income_streams ADD COLUMN IF NOT EXISTS billing_cycle TEXT NOT NULL DEFAULT 'monthly';
+-- Goals tables (added for /goals page):
+CREATE TABLE IF NOT EXISTS goal_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE goal_categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON goal_categories FOR ALL USING (true) WITH CHECK (true);
+INSERT INTO goal_categories (name, position) VALUES
+  ('Recreational', 0), ('Finance', 1), ('Career', 2), ('Health', 3);
+CREATE TABLE IF NOT EXISTS goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  category_id UUID REFERENCES goal_categories(id) ON DELETE SET NULL,
+  horizon TEXT NOT NULL DEFAULT 'short',
+  target_date DATE,
+  notes TEXT,
+  month TEXT,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON goals FOR ALL USING (true) WITH CHECK (true);
+CREATE TABLE IF NOT EXISTS goal_milestones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE goal_milestones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON goal_milestones FOR ALL USING (true) WITH CHECK (true);
+CREATE TABLE IF NOT EXISTS goal_decisions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content TEXT NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE goal_decisions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON goal_decisions FOR ALL USING (true) WITH CHECK (true);
 ```
 
 ## Environment variables
