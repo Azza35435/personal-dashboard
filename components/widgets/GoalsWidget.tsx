@@ -466,7 +466,7 @@ export default function GoalsWidget() {
     return (
       <div key={cat.id} className="space-y-2">
         {/* Category header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between group/cat">
           {isEditingName ? (
             <div className="flex items-center gap-1.5 flex-1">
               <input
@@ -487,14 +487,14 @@ export default function GoalsWidget() {
               {cat.name}
               <button
                 onClick={() => { setEditingCatId(cat.id); setEditingCatName(cat.name) }}
-                className="opacity-0 hover:opacity-100 text-gray-400 hover:text-gray-600 transition normal-case tracking-normal font-normal"
+                className="opacity-0 group-hover/cat:opacity-60 hover:!opacity-100 text-gray-400 hover:text-gray-600 transition normal-case tracking-normal font-normal"
                 title="Rename"
               >
                 ✎
               </button>
               <button
                 onClick={() => deleteCategory(cat.id)}
-                className="opacity-0 hover:opacity-100 text-gray-400 hover:text-red-400 transition normal-case tracking-normal font-normal"
+                className="opacity-0 group-hover/cat:opacity-60 hover:!opacity-100 text-gray-400 hover:text-red-400 transition normal-case tracking-normal font-normal"
                 title="Delete category"
               >
                 ×
