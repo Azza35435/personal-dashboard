@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import GridLayout, { type Layout, type LayoutItem } from 'react-grid-layout'
+import GridLayout, { type Layout, type LayoutItem, useContainerWidth } from 'react-grid-layout'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 
@@ -45,22 +45,10 @@ function WidgetShell({ id, children, onRemove }: { id: string; children: React.R
 }
 
 export default function DashboardPage() {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(1200)
+  const { width, containerRef, mounted } = useContainerWidth()
   const [layout, setLayout] = useState<LayoutItem[]>(DEFAULT_LAYOUT)
   const [layoutLoaded, setLayoutLoaded] = useState(false)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Measure container width for GridLayout
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const obs = new ResizeObserver(entries => {
-      setWidth(entries[0].contentRect.width)
-    })
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
 
   // Load saved layout from Supabase
   useEffect(() => {
@@ -108,7 +96,7 @@ export default function DashboardPage() {
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
-      {width > 0 && (
+      {mounted && (
           <GridLayout
             layout={layout as Layout}
             width={width}
