@@ -38,7 +38,10 @@ type ExListItem =
   | { kind: 'solo'; ex: GymExercise }
   | { kind: 'super'; groupId: string; exs: GymExercise[] }
 
-const todayStr = () => new Date().toISOString().split('T')[0]
+const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 const emptySessionForm = (date?: string) => ({ date: date ?? todayStr(), workout_type: '', duration_minutes: '', color: 'blue' })
 const emptyExForm = (): ExFormState => ({ name: '', sets: [{ reps: '', weight_kg: '' }] })
 
@@ -62,7 +65,8 @@ function getMonthBounds(offset: number) {
   return { first, last, year: first.getFullYear(), month: first.getMonth() }
 }
 
-const isoDate = (d: Date) => d.toISOString().split('T')[0]
+const isoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 function fmtDate(dateStr: string) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
