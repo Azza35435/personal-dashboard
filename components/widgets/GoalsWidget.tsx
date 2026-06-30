@@ -653,6 +653,13 @@ export default function GoalsWidget() {
           renderDecisions()
         ) : (
           <div className="space-y-6">
+            {tab === 'monthly' && (
+              <div className="pb-1 border-b border-gray-100 dark:border-gray-800">
+                <p className="text-base font-semibold text-gray-800 dark:text-gray-200">
+                  {new Date(currentMonth() + '-01T00:00:00').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            )}
             {categories.map(cat => renderCategorySection(cat))}
 
             {/* Add category */}
