@@ -142,6 +142,7 @@ export default function GymWidget() {
   const [editingSessionTitle, setEditingSessionTitle] = useState('')
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
 
   const [widgetBorder, setWidgetBorder] = useState(DEFAULT_BORDER)
   const [showSettings, setShowSettings] = useState(false)
@@ -465,6 +466,7 @@ export default function GymWidget() {
     setSessionForm(emptySessionForm())
     setSelectedTemplateId(null)
     setShowTemplatePicker(false)
+    setSelectedSessionId(null) // go back to list after adding
     if (view === 'month') setSelectedDate(date)
     load()
     loadMonthNutrition()
@@ -472,7 +474,7 @@ export default function GymWidget() {
 
   const deleteSession = async (id: string) => {
     await supabase.from('gym_sessions').delete().eq('id', id)
-    if (view === 'month') setSelectedDate(null)
+    if (view === 'month') { setSelectedDate(null); setSelectedSessionId(null) }
     load()
   }
 
@@ -1061,8 +1063,11 @@ export default function GymWidget() {
   const { first: mFirst, year: mYear, month: mMonth } = getMonthBounds(monthOffset)
   const monthLabel = mFirst.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
   const weeks = buildMonthGrid(mYear, mMonth)
-  const sessionByDate: Record<string, GymSession> = {}
-  for (const s of sessions) sessionByDate[s.date] = s
+  const sessionsByDate: Record<string, GymSession[]> = {}
+  for (const s of sessions) {
+    if (!sessionsByDate[s.date]) sessionsByDate[s.date] = []
+    sessionsByDate[s.date].push(s)
+  }
   const today = todayStr()
 
   function nutritionTint(d: string): 'green' | 'orange' | null {
@@ -1072,7 +1077,8 @@ export default function GymWidget() {
     return 'orange'
   }
 
-  const selectedSession = selectedDate ? (sessionByDate[selectedDate] ?? null) : null
+  const selectedDateSessions = selectedDate ? (sessionsByDate[selectedDate] ?? []) : []
+  const selectedSession = selectedSessionId ? sessions.find(s => s.id === selectedSessionId) ?? null : null
   const selectedExercises = selectedSession ? (exercises[selectedSession.id] ?? []) : []
   const { monday, sunday } = getWeekRange(weekOffset)
   const weekLabel = `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${sunday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
@@ -1093,9 +1099,9 @@ export default function GymWidget() {
           )}
           {view === 'month' && (
             <div className="flex items-center gap-0.5 mt-0.5">
-              <button onClick={() => { setMonthOffset(o => o - 1); setSelectedDate(null); setAddingSession(false) }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm w-5 text-center leading-none transition">‹</button>
+              <button onClick={() => { setMonthOffset(o => o - 1); setSelectedDate(null); setAddingSession(false); setSelectedSessionId(null) }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm w-5 text-center leading-none transition">‹</button>
               <p className="text-xs text-gray-400 dark:text-gray-500">{monthLabel}</p>
-              <button onClick={() => { setMonthOffset(o => o + 1); setSelectedDate(null); setAddingSession(false) }} disabled={monthOffset >= 0} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20 disabled:cursor-not-allowed text-sm w-5 text-center leading-none transition">›</button>
+              <button onClick={() => { setMonthOffset(o => o + 1); setSelectedDate(null); setAddingSession(false); setSelectedSessionId(null) }} disabled={monthOffset >= 0} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-20 disabled:cursor-not-allowed text-sm w-5 text-center leading-none transition">›</button>
             </div>
           )}
           {view === 'all' && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">All sessions</p>}
@@ -1108,7 +1114,7 @@ export default function GymWidget() {
                 key={v}
                 onClick={() => {
                   setView(v); setWeekOffset(0); setSelectedDate(null); setAddingSession(false)
-                  setShowTemplatePicker(false); setSelectedTemplateId(null)
+                  setShowTemplatePicker(false); setSelectedTemplateId(null); setSelectedSessionId(null)
                   setAddingSupersetTo(null); setSupersetRows([emptyExForm(), emptyExForm()])
                   setSelectMode(null); setSelectedExIds(new Set()); setAddingToSuperset(null)
                 }}
@@ -1153,7 +1159,7 @@ export default function GymWidget() {
               <div key={wi} className="grid grid-cols-7 gap-0.5">
                 {week.map((dateStr, di) => {
                   if (!dateStr) return <div key={di} style={{ minHeight: 40 }} />
-                  const session = sessionByDate[dateStr]
+                  const daySessions = sessionsByDate[dateStr] ?? []
                   const tint = nutritionTint(dateStr)
                   const isToday = dateStr === today
                   const isSelected = dateStr === selectedDate
@@ -1162,8 +1168,14 @@ export default function GymWidget() {
                     <button
                       key={dateStr}
                       onClick={() => {
-                        if (isSelected) { setSelectedDate(null); setAddingSession(false); setSessionForm(emptySessionForm()); setSelectedTemplateId(null); setShowTemplatePicker(false) }
-                        else { setSelectedDate(dateStr); setAddingSession(!session); setSessionForm(emptySessionForm(dateStr)); setSelectedTemplateId(null); setShowTemplatePicker(false) }
+                        if (isSelected) {
+                          setSelectedDate(null); setAddingSession(false); setSessionForm(emptySessionForm())
+                          setSelectedTemplateId(null); setShowTemplatePicker(false); setSelectedSessionId(null)
+                        } else {
+                          setSelectedDate(dateStr); setSelectedSessionId(null)
+                          setAddingSession(daySessions.length === 0)
+                          setSessionForm(emptySessionForm(dateStr)); setSelectedTemplateId(null); setShowTemplatePicker(false)
+                        }
                       }}
                       className={`flex flex-col items-center rounded overflow-hidden border transition ${isSelected ? 'border-gray-500 dark:border-gray-400' : isToday ? 'border-gray-400 dark:border-gray-500' : 'border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500'} bg-white dark:bg-gray-900`}
                       style={{ minHeight: 40 }}
@@ -1172,7 +1184,12 @@ export default function GymWidget() {
                         className={`w-full flex-1 flex items-center justify-center text-[11px] ${isToday ? 'font-bold' : 'font-medium'} text-gray-700 dark:text-gray-300`}
                         style={{ backgroundColor: tint === 'green' ? 'rgba(52,211,153,0.18)' : tint === 'orange' ? 'rgba(251,146,60,0.18)' : undefined }}
                       >{day}</div>
-                      <div className="w-full flex-shrink-0" style={{ height: 5, backgroundColor: session ? colorHex(session.color) : 'transparent' }} />
+                      {/* Multiple stripes — one per session */}
+                      <div className="w-full flex-shrink-0 flex" style={{ height: 5 }}>
+                        {daySessions.length > 0
+                          ? daySessions.map(s => <div key={s.id} style={{ flex: 1, backgroundColor: colorHex(s.color) }} />)
+                          : <div style={{ flex: 1 }} />}
+                      </div>
                     </button>
                   )
                 })}
@@ -1188,51 +1205,18 @@ export default function GymWidget() {
           {/* Slide-in panel */}
           {selectedDate && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {selectedSession && !addingSession ? (
-                <div className="p-3 space-y-2.5">
-                  {/* Session header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: colorHex(selectedSession.color) }} />
-                      <div>
-                        {editingSessionTitleId === selectedSession.id ? (
-                          <input
-                            autoFocus
-                            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition"
-                            value={editingSessionTitle}
-                            onChange={e => setEditingSessionTitle(e.target.value)}
-                            onBlur={() => saveSessionTitle(selectedSession.id)}
-                            onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(selectedSession.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }}
-                          />
-                        ) : (
-                          <p className="text-sm font-medium cursor-text hover:text-gray-500 dark:hover:text-gray-400 transition" onClick={() => { setEditingSessionTitleId(selectedSession.id); setEditingSessionTitle(selectedSession.workout_type) }}>{selectedSession.workout_type}</p>
-                        )}
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(selectedSession.date)}{selectedSession.duration_minutes ? ` · ${selectedSession.duration_minutes} min` : ''}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setSavingTemplate(selectedSession.id)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Save template</button>
-                      <button onClick={() => deleteSession(selectedSession.id)} className="text-xs text-red-400 hover:text-red-600 transition">Delete</button>
-                    </div>
-                  </div>
-                  {savingTemplate === selectedSession.id && (
-                    <div className="flex gap-2">
-                      <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(selectedSession) }} />
-                      <button onClick={() => saveAsTemplate(selectedSession)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium px-3 rounded transition">Save</button>
-                      <button onClick={() => { setSavingTemplate(null); setTemplateName('') }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-1">Cancel</button>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {selectedExercises.length === 0 && <p className="text-xs text-gray-400">No exercises logged.</p>}
-                    {renderExerciseList(selectedSession.id, selectedExercises)}
-                  </div>
-                  {renderExerciseAdd(selectedSession.id)}
-                </div>
-              ) : addingSession && selectedDate ? (
+
+              {/* ── Add session form ── */}
+              {addingSession ? (
                 <div className="p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{fmtDate(selectedDate)}</p>
-                    <button onClick={() => { setSelectedDate(null); setAddingSession(false); setSessionForm(emptySessionForm()); setSelectedTemplateId(null); setShowTemplatePicker(false) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Cancel</button>
+                    <div className="flex items-center gap-2">
+                      {selectedDateSessions.length > 0 && (
+                        <button onClick={() => setAddingSession(false)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">←</button>
+                      )}
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{fmtDate(selectedDate)}</p>
+                    </div>
+                    <button onClick={() => { setAddingSession(false); if (selectedDateSessions.length === 0) { setSelectedDate(null) }; setSessionForm(emptySessionForm()); setSelectedTemplateId(null); setShowTemplatePicker(false) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Cancel</button>
                   </div>
                   {templates.length > 0 && !showTemplatePicker && (
                     <button onClick={() => setShowTemplatePicker(true)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Load template →</button>
@@ -1248,6 +1232,74 @@ export default function GymWidget() {
                       </div>
                     </>
                   )}
+                </div>
+
+              /* ── Session detail view ── */
+              ) : selectedSession ? (
+                <div className="p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {selectedDateSessions.length > 1 && (
+                        <button onClick={() => setSelectedSessionId(null)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">←</button>
+                      )}
+                      <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: colorHex(selectedSession.color) }} />
+                      <div>
+                        {editingSessionTitleId === selectedSession.id ? (
+                          <input autoFocus className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" value={editingSessionTitle} onChange={e => setEditingSessionTitle(e.target.value)} onBlur={() => saveSessionTitle(selectedSession.id)} onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(selectedSession.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }} />
+                        ) : (
+                          <p className="text-sm font-medium cursor-text hover:text-gray-500 dark:hover:text-gray-400 transition" onClick={() => { setEditingSessionTitleId(selectedSession.id); setEditingSessionTitle(selectedSession.workout_type) }}>{selectedSession.workout_type}</p>
+                        )}
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(selectedSession.date)}{selectedSession.duration_minutes ? ` · ${selectedSession.duration_minutes} min` : ''}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setSavingTemplate(selectedSession.id)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">Save template</button>
+                      <button onClick={() => { deleteSession(selectedSession.id); setSelectedSessionId(null) }} className="text-xs text-red-400 hover:text-red-600 transition">Delete</button>
+                    </div>
+                  </div>
+                  {savingTemplate === selectedSession.id && (
+                    <div className="flex gap-2">
+                      <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(selectedSession) }} />
+                      <button onClick={() => saveAsTemplate(selectedSession)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium px-3 rounded transition">Save</button>
+                      <button onClick={() => { setSavingTemplate(null); setTemplateName('') }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition px-1">Cancel</button>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    {selectedExercises.length === 0 && <p className="text-xs text-gray-400">No exercises logged.</p>}
+                    {renderExerciseList(selectedSession.id, selectedExercises)}
+                  </div>
+                  {renderExerciseAdd(selectedSession.id)}
+                </div>
+
+              /* ── Session list (multiple sessions on this day) ── */
+              ) : selectedDateSessions.length > 0 ? (
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{fmtDate(selectedDate)} · {selectedDateSessions.length} workout{selectedDateSessions.length !== 1 ? 's' : ''}</p>
+                    <button
+                      onClick={() => { setAddingSession(true); setSessionForm(emptySessionForm(selectedDate)); setSelectedTemplateId(null); setShowTemplatePicker(false) }}
+                      className="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2.5 py-1 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 transition"
+                    >+ Add another</button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {selectedDateSessions.map(s => {
+                      const exs = exercises[s.id] ?? []
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setSelectedSessionId(s.id)}
+                          className="w-full flex items-center gap-2.5 bg-white dark:bg-gray-900 rounded px-3 py-2 border border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500 text-left transition group"
+                          style={{ borderLeft: `3px solid ${colorHex(s.color)}` }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{s.workout_type}</p>
+                            <p className="text-xs text-gray-400">{s.duration_minutes ? `${s.duration_minutes} min · ` : ''}{exs.length} exercise{exs.length !== 1 ? 's' : ''}</p>
+                          </div>
+                          <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 transition">›</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1289,43 +1341,107 @@ export default function GymWidget() {
             <p className="text-sm text-gray-400">{view === 'all' ? 'No sessions logged yet.' : 'No sessions this week.'}</p>
           ) : (
             <div className="space-y-2">
-              {sessions.map(session => {
-                const exs = exercises[session.id] ?? []
-                const isExpanded = expanded.has(session.id)
-                const hex = colorHex(session.color)
-                return (
-                  <div key={session.id} className="bg-gray-50 dark:bg-gray-800 rounded overflow-hidden group border border-gray-100 dark:border-gray-700" style={{ borderLeft: `3px solid ${hex}` }}>
-                    <div className="flex items-center justify-between px-3 py-2.5 cursor-pointer select-none" onClick={() => toggleExpand(session.id)}>
-                      <div className="flex-1 min-w-0">
-                        {editingSessionTitleId === session.id ? (
-                          <input autoFocus className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" value={editingSessionTitle} onChange={e => setEditingSessionTitle(e.target.value)} onBlur={() => saveSessionTitle(session.id)} onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(session.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }} onClick={e => e.stopPropagation()} />
-                        ) : (
-                          <p className="text-sm font-medium cursor-text" onClick={e => { e.stopPropagation(); setEditingSessionTitleId(session.id); setEditingSessionTitle(session.workout_type) }}>{session.workout_type}</p>
+              {/* Group sessions by date */}
+              {(() => {
+                const grouped: { date: string; list: GymSession[] }[] = []
+                for (const s of sessions) {
+                  const last = grouped[grouped.length - 1]
+                  if (last && last.date === s.date) last.list.push(s)
+                  else grouped.push({ date: s.date, list: [s] })
+                }
+                return grouped.map(({ date, list }) => {
+                  if (list.length === 1) {
+                    const session = list[0]
+                    const exs = exercises[session.id] ?? []
+                    const isExpanded = expanded.has(session.id)
+                    const hex = colorHex(session.color)
+                    return (
+                      <div key={session.id} className="bg-gray-50 dark:bg-gray-800 rounded overflow-hidden group border border-gray-100 dark:border-gray-700" style={{ borderLeft: `3px solid ${hex}` }}>
+                        <div className="flex items-center justify-between px-3 py-2.5 cursor-pointer select-none" onClick={() => toggleExpand(session.id)}>
+                          <div className="flex-1 min-w-0">
+                            {editingSessionTitleId === session.id ? (
+                              <input autoFocus className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" value={editingSessionTitle} onChange={e => setEditingSessionTitle(e.target.value)} onBlur={() => saveSessionTitle(session.id)} onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(session.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }} onClick={e => e.stopPropagation()} />
+                            ) : (
+                              <p className="text-sm font-medium cursor-text" onClick={e => { e.stopPropagation(); setEditingSessionTitleId(session.id); setEditingSessionTitle(session.workout_type) }}>{session.workout_type}</p>
+                            )}
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(session.date)}{session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}{exs.length > 0 ? ` · ${exs.length} exercise${exs.length !== 1 ? 's' : ''}` : ''}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSavingTemplate(session.id); setTemplateName('') }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition">template</button>
+                            <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); deleteSession(session.id) }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none transition">×</button>
+                            <span className="text-xs text-gray-400">{isExpanded ? '▴' : '▾'}</span>
+                          </div>
+                        </div>
+                        {savingTemplate === session.id && (
+                          <div className="px-3 pb-2 pt-1 flex gap-2 border-t border-gray-200 dark:border-gray-700">
+                            <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(session) }} />
+                            <button onClick={() => saveAsTemplate(session)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium px-3 rounded transition">Save</button>
+                            <button onClick={() => { setSavingTemplate(null); setTemplateName('') }} className="text-xs text-gray-400 hover:text-gray-600 transition px-1">Cancel</button>
+                          </div>
                         )}
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(session.date)}{session.duration_minutes ? ` · ${session.duration_minutes} min` : ''}{exs.length > 0 ? ` · ${exs.length} exercise${exs.length !== 1 ? 's' : ''}` : ''}</p>
+                        {isExpanded && (
+                          <div className="px-3 pb-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
+                            {renderExerciseList(session.id, exs)}
+                            {renderExerciseAdd(session.id)}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSavingTemplate(session.id); setTemplateName('') }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition">template</button>
-                        <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); deleteSession(session.id) }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none transition">×</button>
-                        <span className="text-xs text-gray-400">{isExpanded ? '▴' : '▾'}</span>
+                    )
+                  }
+
+                  // Multiple sessions on same day — combined card
+                  return (
+                    <div key={date} className="bg-gray-50 dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-700 overflow-hidden">
+                      {/* Date header with multi-colour stripe */}
+                      <div className="flex items-center gap-0 border-b border-gray-200 dark:border-gray-700" style={{ height: 3 }}>
+                        {list.map(s => <div key={s.id} style={{ flex: 1, backgroundColor: colorHex(s.color) }} />)}
+                      </div>
+                      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{fmtDate(date)} · {list.length} workouts</p>
+                      </div>
+                      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {list.map(session => {
+                          const exs = exercises[session.id] ?? []
+                          const isExpanded = expanded.has(session.id)
+                          const hex = colorHex(session.color)
+                          return (
+                            <div key={session.id} className="group" style={{ borderLeft: `3px solid ${hex}` }}>
+                              <div className="flex items-center justify-between px-3 py-2.5 cursor-pointer select-none" onClick={() => toggleExpand(session.id)}>
+                                <div className="flex-1 min-w-0">
+                                  {editingSessionTitleId === session.id ? (
+                                    <input autoFocus className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 text-sm font-medium outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" value={editingSessionTitle} onChange={e => setEditingSessionTitle(e.target.value)} onBlur={() => saveSessionTitle(session.id)} onKeyDown={e => { if (e.key === 'Enter') saveSessionTitle(session.id); if (e.key === 'Escape') setEditingSessionTitleId(null) }} onClick={e => e.stopPropagation()} />
+                                  ) : (
+                                    <p className="text-sm font-medium cursor-text" onClick={e => { e.stopPropagation(); setEditingSessionTitleId(session.id); setEditingSessionTitle(session.workout_type) }}>{session.workout_type}</p>
+                                  )}
+                                  <p className="text-xs text-gray-400 dark:text-gray-500">{session.duration_minutes ? `${session.duration_minutes} min · ` : ''}{exs.length} exercise{exs.length !== 1 ? 's' : ''}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSavingTemplate(session.id); setTemplateName('') }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-xs transition">template</button>
+                                  <button onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); deleteSession(session.id) }} className="opacity-0 group-hover:opacity-40 hover:!opacity-80 text-gray-500 text-base leading-none transition">×</button>
+                                  <span className="text-xs text-gray-400">{isExpanded ? '▴' : '▾'}</span>
+                                </div>
+                              </div>
+                              {savingTemplate === session.id && (
+                                <div className="px-3 pb-2 pt-1 flex gap-2 border-t border-gray-200 dark:border-gray-700">
+                                  <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(session) }} />
+                                  <button onClick={() => saveAsTemplate(session)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium px-3 rounded transition">Save</button>
+                                  <button onClick={() => { setSavingTemplate(null); setTemplateName('') }} className="text-xs text-gray-400 hover:text-gray-600 transition px-1">Cancel</button>
+                                </div>
+                              )}
+                              {isExpanded && (
+                                <div className="px-3 pb-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
+                                  {renderExerciseList(session.id, exs)}
+                                  {renderExerciseAdd(session.id)}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
-                    {savingTemplate === session.id && (
-                      <div className="px-3 pb-2 pt-1 flex gap-2 border-t border-gray-200 dark:border-gray-700">
-                        <input autoFocus className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1 text-sm placeholder-gray-400 outline-none text-gray-900 dark:text-gray-100 focus:border-gray-400 transition" placeholder="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveAsTemplate(session) }} />
-                        <button onClick={() => saveAsTemplate(session)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium px-3 rounded transition">Save</button>
-                        <button onClick={() => { setSavingTemplate(null); setTemplateName('') }} className="text-xs text-gray-400 hover:text-gray-600 transition px-1">Cancel</button>
-                      </div>
-                    )}
-                    {isExpanded && (
-                      <div className="px-3 pb-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
-                        {renderExerciseList(session.id, exs)}
-                        {renderExerciseAdd(session.id)}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
           )}
         </>
