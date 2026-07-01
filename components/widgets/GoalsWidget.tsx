@@ -115,32 +115,23 @@ export default function GoalsWidget() {
     const prevVm = viewMonth(monthOffset - 1)
     const hasPrevMonth = prevVm >= EARLIEST_MONTH
 
-    let goalsQuery: Promise<{ data: unknown[] | null; error?: unknown }>
-    if (tab === 'decisions') {
-      goalsQuery = Promise.resolve({ data: [] })
-    } else if (tab === 'monthly') {
-      goalsQuery = supabase.from('goals').select('*').eq('horizon', 'monthly').eq('month', vm).order('position').order('created_at')
-    } else {
-      goalsQuery = supabase.from('goals').select('*').eq('horizon', tab).order('position').order('created_at')
-    }
-
-    const reviewQuery = tab === 'monthly' && hasPrevMonth
-      ? supabase.from('goals').select('*').eq('horizon', 'monthly').eq('month', prevVm).eq('completed', false).order('position').order('created_at')
-      : Promise.resolve({ data: [] })
-
-    const decisionsQuery = tab === 'decisions'
-      ? supabase.from('goal_decisions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] })
-
     const [catsRes, goalsRes, reviewRes, decisionsRes] = await Promise.all([
       supabase.from('goal_categories').select('*').order('position'),
-      goalsQuery,
-      reviewQuery,
-      decisionsQuery,
+      tab === 'decisions'
+        ? Promise.resolve({ data: [] as Goal[], error: null })
+        : tab === 'monthly'
+          ? supabase.from('goals').select('*').eq('horizon', 'monthly').eq('month', vm).order('position').order('created_at')
+          : supabase.from('goals').select('*').eq('horizon', tab).order('position').order('created_at'),
+      tab === 'monthly' && hasPrevMonth
+        ? supabase.from('goals').select('*').eq('horizon', 'monthly').eq('month', prevVm).eq('completed', false).order('position').order('created_at')
+        : Promise.resolve({ data: [] as Goal[], error: null }),
+      tab === 'decisions'
+        ? supabase.from('goal_decisions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as Decision[], error: null }),
     ])
 
-    if ('error' in catsRes && catsRes.error) setSaveError((catsRes.error as { message: string }).message)
-    if ('error' in goalsRes && goalsRes.error) setSaveError((goalsRes.error as { message: string }).message)
+    if (catsRes.error) setSaveError(catsRes.error.message)
+    if (goalsRes.error) setSaveError(goalsRes.error.message)
 
     const loadedGoals = (goalsRes.data ?? []) as Goal[]
     setCategories((catsRes.data ?? []) as GoalCategory[])
