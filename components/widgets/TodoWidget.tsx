@@ -39,6 +39,7 @@ interface EditingCard {
   dueDate: string
   sectionIds: string[]
   anchorRight: number  // right edge of the ··· button (viewport coords)
+  anchorTop: number    // top edge of the ··· button (viewport coords)
   anchorBottom: number // bottom edge of the ··· button (viewport coords)
 }
 
@@ -239,6 +240,7 @@ export default function TodoWidget() {
       dueDate: todo.due_date ?? '',
       sectionIds: todo.todo_sections.map(ts => ts.section_id),
       anchorRight: rect.right,
+      anchorTop: rect.top,
       anchorBottom: rect.bottom,
     })
   }
@@ -711,7 +713,10 @@ export default function TodoWidget() {
             className="fixed z-50 w-56 rounded p-3 flex flex-col gap-2.5 shadow-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
             style={{
               right: window.innerWidth - editingCard.anchorRight,
-              top: editingCard.anchorBottom + 6,
+              ...(window.innerHeight - editingCard.anchorBottom < 260
+                ? { bottom: window.innerHeight - editingCard.anchorTop + 6 }
+                : { top: editingCard.anchorBottom + 6 }
+              ),
             }}
             onPointerDown={e => e.stopPropagation()}
             onClick={e => e.stopPropagation()}
