@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Horizon = 'monthly' | 'short' | 'long'
+type GoalStatus = 'active' | 'carried' | 'abandoned'
 
 interface GoalCategory {
   id: string
@@ -22,6 +23,8 @@ interface Goal {
   completed: boolean
   position: number
   created_at: string
+  status: GoalStatus
+  carried_to_goal_id: string | null
 }
 
 interface Milestone {
@@ -39,21 +42,16 @@ interface Decision {
   created_at: string
 }
 
-const HORIZON_LABELS: Record<Horizon, string> = {
-  monthly: 'Monthly',
-  short: 'Short-term',
-  long: 'Long-term',
-}
-
-function currentMonth() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
 function viewMonth(offset: number) {
   const d = new Date()
   d.setDate(1)
   d.setMonth(d.getMonth() + offset)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function addOneMonth(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
@@ -69,6 +67,11 @@ function formatMonth(ym: string) {
   return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
 }
 
+function formatMonthShort(ym: string) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-AU', { month: 'long' })
+}
+
 function progressFromMilestones(ms: Milestone[]) {
   if (!ms.length) return null
   return Math.round((ms.filter(m => m.completed).length / ms.length) * 100)
@@ -78,34 +81,29 @@ export default function GoalsWidget() {
   const [tab, setTab] = useState<Horizon | 'decisions'>('monthly')
   const [categories, setCategories] = useState<GoalCategory[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
+  const [reviewGoals, setReviewGoals] = useState<Goal[]>([])
   const [milestones, setMilestones] = useState<Record<string, Milestone[]>>({})
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [loading, setLoading] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [monthOffset, setMonthOffset] = useState(0)
 
-  // Expanded goal
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  // Category editing
   const [editingCatId, setEditingCatId] = useState<string | null>(null)
   const [editingCatName, setEditingCatName] = useState('')
   const [addingCat, setAddingCat] = useState(false)
   const [newCatName, setNewCatName] = useState('')
 
-  // Goal adding
   const [addingGoalCatId, setAddingGoalCatId] = useState<string | null>(null)
   const [newGoalTitle, setNewGoalTitle] = useState('')
   const [newGoalDate, setNewGoalDate] = useState('')
 
-  // Goal editing (inline on expanded card)
   const [editingGoal, setEditingGoal] = useState<Partial<Goal> & { id: string } | null>(null)
 
-  // Milestone adding
   const [addingMilestoneGoalId, setAddingMilestoneGoalId] = useState<string | null>(null)
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('')
 
-  // Decision adding
   const [addingDecision, setAddingDecision] = useState(false)
   const [newDecisionContent, setNewDecisionContent] = useState('')
   const [newDecisionDate, setNewDecisionDate] = useState(localToday())
@@ -113,43 +111,47 @@ export default function GoalsWidget() {
   const load = useCallback(async () => {
     setLoading(true)
 
-    const [catsRes, goalsRes, decisionsRes] = await Promise.all([
+    const vm = viewMonth(monthOffset)
+    const prevVm = viewMonth(monthOffset - 1)
+    const hasPrevMonth = prevVm >= EARLIEST_MONTH
+
+    let goalsQuery: Promise<{ data: unknown[] | null; error?: unknown }>
+    if (tab === 'decisions') {
+      goalsQuery = Promise.resolve({ data: [] })
+    } else if (tab === 'monthly') {
+      goalsQuery = supabase.from('goals').select('*').eq('horizon', 'monthly').eq('month', vm).order('position').order('created_at')
+    } else {
+      goalsQuery = supabase.from('goals').select('*').eq('horizon', tab).order('position').order('created_at')
+    }
+
+    const reviewQuery = tab === 'monthly' && hasPrevMonth
+      ? supabase.from('goals').select('*').eq('horizon', 'monthly').eq('month', prevVm).eq('completed', false).order('position').order('created_at')
+      : Promise.resolve({ data: [] })
+
+    const decisionsQuery = tab === 'decisions'
+      ? supabase.from('goal_decisions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] })
+
+    const [catsRes, goalsRes, reviewRes, decisionsRes] = await Promise.all([
       supabase.from('goal_categories').select('*').order('position'),
-      tab !== 'decisions'
-        ? supabase.from('goals').select('*').eq('horizon', tab).order('position').order('created_at')
-        : Promise.resolve({ data: [] }),
-      tab === 'decisions'
-        ? supabase.from('goal_decisions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
+      goalsQuery,
+      reviewQuery,
+      decisionsQuery,
     ])
 
-    if ('error' in catsRes && catsRes.error) setSaveError(catsRes.error.message)
-    if ('error' in goalsRes && goalsRes.error) setSaveError(goalsRes.error.message)
-    if ('error' in decisionsRes && decisionsRes.error) setSaveError(decisionsRes.error.message)
+    if ('error' in catsRes && catsRes.error) setSaveError((catsRes.error as { message: string }).message)
+    if ('error' in goalsRes && goalsRes.error) setSaveError((goalsRes.error as { message: string }).message)
 
-    const loadedCategories = (catsRes.data ?? []) as GoalCategory[]
     const loadedGoals = (goalsRes.data ?? []) as Goal[]
-    const loadedDecisions = (decisionsRes.data ?? []) as Decision[]
+    setCategories((catsRes.data ?? []) as GoalCategory[])
+    setGoals(loadedGoals)
+    setReviewGoals((reviewRes.data ?? []) as Goal[])
+    setDecisions((decisionsRes.data ?? []) as Decision[])
 
-    setCategories(loadedCategories)
-    setDecisions(loadedDecisions)
-
-    // For monthly tab: include selected month + past incomplete carried goals
-    let filtered = loadedGoals
-    if (tab === 'monthly') {
-      const vm = viewMonth(monthOffset)
-      filtered = loadedGoals.filter(g => g.month === vm || (g.month && g.month < vm && !g.completed))
-    }
-    setGoals(filtered)
-
-    // Load milestones for all goals
-    if (filtered.length > 0) {
-      const ids = filtered.map(g => g.id)
-      const { data: ms } = await supabase
-        .from('goal_milestones')
-        .select('*')
-        .in('goal_id', ids)
-        .order('position')
+    const allGoals = [...loadedGoals, ...(reviewRes.data ?? []) as Goal[]]
+    const ids = [...new Set(allGoals.map(g => g.id))]
+    if (ids.length > 0) {
+      const { data: ms } = await supabase.from('goal_milestones').select('*').in('goal_id', ids).order('position')
       const grouped: Record<string, Milestone[]> = {}
       for (const m of (ms ?? []) as Milestone[]) {
         if (!grouped[m.goal_id]) grouped[m.goal_id] = []
@@ -172,17 +174,14 @@ export default function GoalsWidget() {
     if (!name) return
     const { error } = await supabase.from('goal_categories').insert({ name, position: categories.length })
     if (error) { setSaveError(error.message); return }
-    setNewCatName('')
-    setAddingCat(false)
-    load()
+    setNewCatName(''); setAddingCat(false); load()
   }
 
   const renameCategory = async (id: string) => {
     const name = editingCatName.trim()
     if (!name) return
     await supabase.from('goal_categories').update({ name }).eq('id', id)
-    setEditingCatId(null)
-    load()
+    setEditingCatId(null); load()
   }
 
   const deleteCategory = async (id: string) => {
@@ -203,12 +202,10 @@ export default function GoalsWidget() {
       target_date: newGoalDate || null,
       month: tab === 'monthly' ? viewMonth(monthOffset) : null,
       position: goals.filter(g => g.category_id === catId).length,
+      status: 'active',
     })
     if (error) { setSaveError(error.message); return }
-    setNewGoalTitle('')
-    setNewGoalDate('')
-    setAddingGoalCatId(null)
-    load()
+    setNewGoalTitle(''); setNewGoalDate(''); setAddingGoalCatId(null); load()
   }
 
   const updateGoal = async (id: string, fields: Partial<Goal>) => {
@@ -219,6 +216,53 @@ export default function GoalsWidget() {
   const deleteGoal = async (id: string) => {
     await supabase.from('goals').delete().eq('id', id)
     if (expandedId === id) setExpandedId(null)
+    load()
+  }
+
+  // ── Carry / Abandon ───────────────────────────────────────────
+
+  const carryGoal = async (goal: Goal) => {
+    setSaveError(null)
+    const targetMonth = viewMonth(monthOffset)
+    const { data: newGoal, error: insertErr } = await supabase.from('goals').insert({
+      title: goal.title,
+      category_id: goal.category_id,
+      horizon: 'monthly',
+      month: targetMonth,
+      notes: goal.notes,
+      position: goals.filter(g => g.category_id === goal.category_id).length,
+      status: 'active',
+    }).select().single()
+    if (insertErr || !newGoal) { setSaveError(insertErr?.message ?? 'Failed to carry goal'); return }
+    const { error: updateErr } = await supabase.from('goals').update({
+      status: 'carried',
+      carried_to_goal_id: (newGoal as Goal).id,
+    }).eq('id', goal.id)
+    if (updateErr) { setSaveError(updateErr.message); return }
+    load()
+  }
+
+  const abandonGoal = async (goal: Goal) => {
+    setSaveError(null)
+    const { error } = await supabase.from('goals').update({ status: 'abandoned' }).eq('id', goal.id)
+    if (error) { setSaveError(error.message); return }
+    load()
+  }
+
+  const undoCarry = async (goal: Goal) => {
+    setSaveError(null)
+    if (goal.carried_to_goal_id) {
+      await supabase.from('goals').delete().eq('id', goal.carried_to_goal_id)
+    }
+    const { error } = await supabase.from('goals').update({ status: 'active', carried_to_goal_id: null }).eq('id', goal.id)
+    if (error) { setSaveError(error.message); return }
+    load()
+  }
+
+  const undoAbandon = async (goal: Goal) => {
+    setSaveError(null)
+    const { error } = await supabase.from('goals').update({ status: 'active' }).eq('id', goal.id)
+    if (error) { setSaveError(error.message); return }
     load()
   }
 
@@ -238,9 +282,7 @@ export default function GoalsWidget() {
     const pos = (milestones[goalId] ?? []).length
     const { error } = await supabase.from('goal_milestones').insert({ goal_id: goalId, title, position: pos })
     if (error) { setSaveError(error.message); return }
-    setNewMilestoneTitle('')
-    setAddingMilestoneGoalId(null)
-    load()
+    setNewMilestoneTitle(''); setAddingMilestoneGoalId(null); load()
   }
 
   const deleteMilestone = async (m: Milestone) => {
@@ -259,10 +301,7 @@ export default function GoalsWidget() {
     setSaveError(null)
     const { error } = await supabase.from('goal_decisions').insert({ content, date: newDecisionDate })
     if (error) { setSaveError(error.message); return }
-    setNewDecisionContent('')
-    setNewDecisionDate(localToday())
-    setAddingDecision(false)
-    load()
+    setNewDecisionContent(''); setNewDecisionDate(localToday()); setAddingDecision(false); load()
   }
 
   const deleteDecision = async (id: string) => {
@@ -288,21 +327,20 @@ export default function GoalsWidget() {
     const ms = milestones[goal.id] ?? []
     const pct = progressFromMilestones(ms)
     const isExpanded = expandedId === goal.id
-    const isCarried = tab === 'monthly' && goal.month !== null && goal.month < viewMonth(monthOffset)
+    const isAbandoned = goal.status === 'abandoned'
+    const isCarried = goal.status === 'carried'
 
     return (
       <div
         key={goal.id}
         className={`rounded border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 transition ${
-          goal.completed ? 'opacity-50' : ''
+          goal.completed || isAbandoned ? 'opacity-50' : ''
         }`}
       >
-        {/* Goal header row */}
         <button
           onClick={() => setExpandedId(isExpanded ? null : goal.id)}
           className="w-full text-left px-3 py-2.5 flex items-start gap-2 group"
         >
-          {/* Complete toggle */}
           <button
             onClick={e => { e.stopPropagation(); updateGoal(goal.id, { completed: !goal.completed }) }}
             className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 transition flex items-center justify-center ${
@@ -317,12 +355,19 @@ export default function GoalsWidget() {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-sm font-medium leading-snug ${goal.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>
+              <span className={`text-sm font-medium leading-snug ${
+                goal.completed || isAbandoned ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100'
+              }`}>
                 {goal.title}
               </span>
-              {isCarried && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium flex-shrink-0">
-                  carried from {formatMonth(goal.month!)}
+              {isCarried && goal.month && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium flex-shrink-0">
+                  → {formatMonthShort(addOneMonth(goal.month))}
+                </span>
+              )}
+              {isAbandoned && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-400 font-medium flex-shrink-0">
+                  Abandoned
                 </span>
               )}
               {goal.target_date && (
@@ -344,10 +389,8 @@ export default function GoalsWidget() {
           <span className={`text-gray-300 dark:text-gray-600 text-xs flex-shrink-0 mt-0.5 transition ${isExpanded ? 'rotate-90' : ''}`}>›</span>
         </button>
 
-        {/* Expanded body */}
         {isExpanded && (
           <div className="px-3 pb-3 space-y-3 border-t border-gray-100 dark:border-gray-800 pt-2">
-            {/* Edit title / date / notes */}
             {editingGoal?.id === goal.id ? (
               <div className="space-y-2">
                 <input
@@ -394,12 +437,10 @@ export default function GoalsWidget() {
             ) : (
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5 flex-1 min-w-0">
-                  {goal.notes && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{goal.notes}</p>
-                  )}
-                  {!goal.notes && (
-                    <p className="text-xs text-gray-300 dark:text-gray-600 italic">No notes</p>
-                  )}
+                  {goal.notes
+                    ? <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{goal.notes}</p>
+                    : <p className="text-xs text-gray-300 dark:text-gray-600 italic">No notes</p>
+                  }
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   <button
@@ -408,17 +449,13 @@ export default function GoalsWidget() {
                   >
                     ✎
                   </button>
-                  <button
-                    onClick={() => deleteGoal(goal.id)}
-                    className="text-xs text-gray-400 hover:text-red-500"
-                  >
+                  <button onClick={() => deleteGoal(goal.id)} className="text-xs text-gray-400 hover:text-red-500">
                     ×
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Milestones */}
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1.5">Milestones</p>
               <div className="space-y-1">
@@ -427,9 +464,7 @@ export default function GoalsWidget() {
                     <button
                       onClick={() => toggleMilestone(m)}
                       className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition ${
-                        m.completed
-                          ? 'bg-emerald-400 border-emerald-400'
-                          : 'border-gray-300 dark:border-gray-600 hover:border-violet-400'
+                        m.completed ? 'bg-emerald-400 border-emerald-400' : 'border-gray-300 dark:border-gray-600 hover:border-violet-400'
                       }`}
                     >
                       {m.completed && <span className="text-white text-[8px] leading-none">✓</span>}
@@ -446,8 +481,6 @@ export default function GoalsWidget() {
                   </div>
                 ))}
               </div>
-
-              {/* Add milestone */}
               {addingMilestoneGoalId === goal.id ? (
                 <div className="flex gap-1.5 mt-2">
                   <input
@@ -480,13 +513,76 @@ export default function GoalsWidget() {
     )
   }
 
+  function renderReviewPanel() {
+    if (reviewGoals.length === 0) return null
+    const prevVm = viewMonth(monthOffset - 1)
+    const currentMonthLabel = formatMonthShort(viewMonth(monthOffset))
+
+    return (
+      <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
+        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            Review — {formatMonth(prevVm)}
+          </p>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            {reviewGoals.filter(g => g.status === 'active').length} undecided
+          </span>
+        </div>
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          {reviewGoals.map(goal => (
+            <div key={goal.id} className="px-3 py-2.5 flex items-center gap-3">
+              <span className={`flex-1 text-sm min-w-0 truncate ${
+                goal.status === 'abandoned' ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'
+              }`}>
+                {goal.title}
+              </span>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {goal.status === 'active' && (
+                  <>
+                    <button
+                      onClick={() => carryGoal(goal)}
+                      className="text-[11px] px-2 py-1 rounded bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40 border border-violet-200 dark:border-violet-800 transition font-medium"
+                    >
+                      → {currentMonthLabel}
+                    </button>
+                    <button
+                      onClick={() => abandonGoal(goal)}
+                      className="text-[11px] px-2 py-1 rounded text-gray-400 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-gray-700 transition"
+                    >
+                      Abandon
+                    </button>
+                  </>
+                )}
+                {goal.status === 'carried' && (
+                  <>
+                    <span className="text-[11px] text-violet-500 dark:text-violet-400 font-medium">→ {currentMonthLabel}</span>
+                    <button onClick={() => undoCarry(goal)} className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline">
+                      undo
+                    </button>
+                  </>
+                )}
+                {goal.status === 'abandoned' && (
+                  <>
+                    <span className="text-[11px] text-gray-400">Abandoned</span>
+                    <button onClick={() => undoAbandon(goal)} className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline">
+                      undo
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   function renderCategorySection(cat: GoalCategory) {
     const catGoals = goals.filter(g => g.category_id === cat.id)
     const isEditingName = editingCatId === cat.id
 
     return (
       <div key={cat.id} className="space-y-2">
-        {/* Category header */}
         <div className="flex items-center justify-between group/cat">
           {isEditingName ? (
             <div className="flex items-center gap-1.5 flex-1">
@@ -522,7 +618,6 @@ export default function GoalsWidget() {
               </button>
             </p>
           )}
-
           <button
             onClick={() => { setAddingGoalCatId(cat.id); setNewGoalTitle(''); setNewGoalDate('') }}
             className="text-[11px] text-gray-400 hover:text-violet-500 dark:hover:text-violet-400 transition"
@@ -531,7 +626,6 @@ export default function GoalsWidget() {
           </button>
         </div>
 
-        {/* Add goal form */}
         {addingGoalCatId === cat.id && (
           <div className="bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-2.5 space-y-2">
             <input
@@ -548,7 +642,6 @@ export default function GoalsWidget() {
                 className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2.5 py-1.5 text-xs outline-none text-gray-700 dark:text-gray-300"
                 value={newGoalDate}
                 onChange={e => setNewGoalDate(e.target.value)}
-                placeholder="Target date (optional)"
               />
               <button onClick={() => addGoal(cat.id)} className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-xs px-3 py-1.5 rounded">
                 Add
@@ -560,7 +653,6 @@ export default function GoalsWidget() {
           </div>
         )}
 
-        {/* Goals list */}
         <div className="space-y-1.5">
           {catGoals.length === 0 && (
             <p className="text-xs text-gray-300 dark:text-gray-600 italic px-1">No goals yet</p>
@@ -641,12 +733,10 @@ export default function GoalsWidget() {
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-2 border-l-violet-400 rounded shadow-sm flex flex-col h-full">
-      {/* Header */}
       <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between flex-shrink-0">
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Goals</p>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         {TABS.map(t => (
           <button
@@ -664,7 +754,6 @@ export default function GoalsWidget() {
         ))}
       </div>
 
-      {/* Error banner */}
       {saveError && (
         <div className="mx-5 mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
           <span className="flex-1">{saveError}</span>
@@ -672,7 +761,6 @@ export default function GoalsWidget() {
         </div>
       )}
 
-      {/* Body */}
       <div className="flex-1 overflow-y-auto p-5">
         {loading ? (
           <div className="space-y-3">
@@ -683,31 +771,33 @@ export default function GoalsWidget() {
         ) : (
           <div className="space-y-6">
             {tab === 'monthly' && (
-              <div className="pb-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                <p className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                  {new Date(viewMonth(monthOffset) + '-01T00:00:00').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setMonthOffset(o => o - 1)}
-                    disabled={viewMonth(monthOffset - 1) < EARLIEST_MONTH}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() => setMonthOffset(o => o + 1)}
-                    disabled={monthOffset >= 0}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  >
-                    ›
-                  </button>
+              <>
+                <div className="pb-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                  <p className="text-base font-semibold text-gray-800 dark:text-gray-200">
+                    {new Date(viewMonth(monthOffset) + '-01T00:00:00').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setMonthOffset(o => o - 1)}
+                      disabled={viewMonth(monthOffset - 1) < EARLIEST_MONTH}
+                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() => setMonthOffset(o => o + 1)}
+                      disabled={monthOffset >= 0}
+                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    >
+                      ›
+                    </button>
+                  </div>
                 </div>
-              </div>
+                {renderReviewPanel()}
+              </>
             )}
             {categories.map(cat => renderCategorySection(cat))}
 
-            {/* Add category */}
             {addingCat ? (
               <div className="flex gap-2 items-center">
                 <input
