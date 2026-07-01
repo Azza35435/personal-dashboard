@@ -72,6 +72,7 @@ export default function GoalsWidget() {
   const [milestones, setMilestones] = useState<Record<string, Milestone[]>>({})
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [loading, setLoading] = useState(true)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Expanded goal
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -111,6 +112,10 @@ export default function GoalsWidget() {
         ? supabase.from('goal_decisions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] }),
     ])
+
+    if ('error' in catsRes && catsRes.error) setSaveError(catsRes.error.message)
+    if ('error' in goalsRes && goalsRes.error) setSaveError(goalsRes.error.message)
+    if ('error' in decisionsRes && decisionsRes.error) setSaveError(decisionsRes.error.message)
 
     const loadedCategories = (catsRes.data ?? []) as GoalCategory[]
     const loadedGoals = (goalsRes.data ?? []) as Goal[]
@@ -155,7 +160,8 @@ export default function GoalsWidget() {
   const addCategory = async () => {
     const name = newCatName.trim()
     if (!name) return
-    await supabase.from('goal_categories').insert({ name, position: categories.length })
+    const { error } = await supabase.from('goal_categories').insert({ name, position: categories.length })
+    if (error) { setSaveError(error.message); return }
     setNewCatName('')
     setAddingCat(false)
     load()
@@ -179,7 +185,8 @@ export default function GoalsWidget() {
   const addGoal = async (catId: string) => {
     const title = newGoalTitle.trim()
     if (!title) return
-    await supabase.from('goals').insert({
+    setSaveError(null)
+    const { error } = await supabase.from('goals').insert({
       title,
       category_id: catId,
       horizon: tab === 'decisions' ? 'short' : tab,
@@ -187,6 +194,7 @@ export default function GoalsWidget() {
       month: tab === 'monthly' ? currentMonth() : null,
       position: goals.filter(g => g.category_id === catId).length,
     })
+    if (error) { setSaveError(error.message); return }
     setNewGoalTitle('')
     setNewGoalDate('')
     setAddingGoalCatId(null)
@@ -218,7 +226,8 @@ export default function GoalsWidget() {
     const title = newMilestoneTitle.trim()
     if (!title) return
     const pos = (milestones[goalId] ?? []).length
-    await supabase.from('goal_milestones').insert({ goal_id: goalId, title, position: pos })
+    const { error } = await supabase.from('goal_milestones').insert({ goal_id: goalId, title, position: pos })
+    if (error) { setSaveError(error.message); return }
     setNewMilestoneTitle('')
     setAddingMilestoneGoalId(null)
     load()
@@ -237,7 +246,9 @@ export default function GoalsWidget() {
   const addDecision = async () => {
     const content = newDecisionContent.trim()
     if (!content) return
-    await supabase.from('goal_decisions').insert({ content, date: newDecisionDate })
+    setSaveError(null)
+    const { error } = await supabase.from('goal_decisions').insert({ content, date: newDecisionDate })
+    if (error) { setSaveError(error.message); return }
     setNewDecisionContent('')
     setNewDecisionDate(localToday())
     setAddingDecision(false)
@@ -642,6 +653,14 @@ export default function GoalsWidget() {
           </button>
         ))}
       </div>
+
+      {/* Error banner */}
+      {saveError && (
+        <div className="mx-5 mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
+          <span className="flex-1">{saveError}</span>
+          <button onClick={() => setSaveError(null)} className="flex-shrink-0 text-red-400 hover:text-red-600">×</button>
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-5">

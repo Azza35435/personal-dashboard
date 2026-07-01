@@ -179,3 +179,52 @@ CREATE POLICY "Allow all" ON curriculars FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_metrics FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_notes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON curricular_links FOR ALL USING (true) WITH CHECK (true);
+
+-- Goals tables
+CREATE TABLE IF NOT EXISTS goal_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+INSERT INTO goal_categories (name, position) VALUES
+  ('Recreational', 0), ('Finance', 1), ('Career', 2), ('Health', 3)
+ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  category_id UUID REFERENCES goal_categories(id) ON DELETE SET NULL,
+  horizon TEXT NOT NULL DEFAULT 'short',
+  target_date DATE,
+  notes TEXT,
+  month TEXT,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS goal_milestones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS goal_decisions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content TEXT NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE goal_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goal_milestones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goal_decisions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON goal_categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON goals FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON goal_milestones FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON goal_decisions FOR ALL USING (true) WITH CHECK (true);
