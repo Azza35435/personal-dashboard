@@ -50,6 +50,15 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function viewMonth(offset: number) {
+  const d = new Date()
+  d.setDate(1)
+  d.setMonth(d.getMonth() + offset)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+const EARLIEST_MONTH = '2026-06'
+
 function localToday() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -73,6 +82,7 @@ export default function GoalsWidget() {
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [loading, setLoading] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [monthOffset, setMonthOffset] = useState(0)
 
   // Expanded goal
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -124,11 +134,11 @@ export default function GoalsWidget() {
     setCategories(loadedCategories)
     setDecisions(loadedDecisions)
 
-    // For monthly tab: include current month + past incomplete
+    // For monthly tab: include selected month + past incomplete carried goals
     let filtered = loadedGoals
     if (tab === 'monthly') {
-      const cm = currentMonth()
-      filtered = loadedGoals.filter(g => g.month === cm || (g.month && g.month < cm && !g.completed))
+      const vm = viewMonth(monthOffset)
+      filtered = loadedGoals.filter(g => g.month === vm || (g.month && g.month < vm && !g.completed))
     }
     setGoals(filtered)
 
@@ -151,7 +161,7 @@ export default function GoalsWidget() {
     }
 
     setLoading(false)
-  }, [tab])
+  }, [tab, monthOffset])
 
   useEffect(() => { load() }, [load])
 
@@ -191,7 +201,7 @@ export default function GoalsWidget() {
       category_id: catId,
       horizon: tab === 'decisions' ? 'short' : tab,
       target_date: newGoalDate || null,
-      month: tab === 'monthly' ? currentMonth() : null,
+      month: tab === 'monthly' ? viewMonth(monthOffset) : null,
       position: goals.filter(g => g.category_id === catId).length,
     })
     if (error) { setSaveError(error.message); return }
@@ -278,7 +288,7 @@ export default function GoalsWidget() {
     const ms = milestones[goal.id] ?? []
     const pct = progressFromMilestones(ms)
     const isExpanded = expandedId === goal.id
-    const isCarried = tab === 'monthly' && goal.month !== null && goal.month < currentMonth()
+    const isCarried = tab === 'monthly' && goal.month !== null && goal.month < viewMonth(monthOffset)
 
     return (
       <div
@@ -673,10 +683,26 @@ export default function GoalsWidget() {
         ) : (
           <div className="space-y-6">
             {tab === 'monthly' && (
-              <div className="pb-1 border-b border-gray-100 dark:border-gray-800">
+              <div className="pb-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <p className="text-base font-semibold text-gray-800 dark:text-gray-200">
-                  {new Date(currentMonth() + '-01T00:00:00').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                  {new Date(viewMonth(monthOffset) + '-01T00:00:00').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
                 </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setMonthOffset(o => o - 1)}
+                    disabled={viewMonth(monthOffset - 1) < EARLIEST_MONTH}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() => setMonthOffset(o => o + 1)}
+                    disabled={monthOffset >= 0}
+                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    ›
+                  </button>
+                </div>
               </div>
             )}
             {categories.map(cat => renderCategorySection(cat))}
