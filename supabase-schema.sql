@@ -228,3 +228,38 @@ CREATE POLICY "Allow all" ON goal_categories FOR ALL USING (true) WITH CHECK (tr
 CREATE POLICY "Allow all" ON goals FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON goal_milestones FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON goal_decisions FOR ALL USING (true) WITH CHECK (true);
+
+-- Shopping Waitlist (added for /shopping page):
+CREATE TABLE IF NOT EXISTS shopping_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  search_query TEXT,
+  woolworths_url TEXT,
+  coles_url TEXT,
+  chemist_url TEXT,
+  alert_type TEXT NOT NULL DEFAULT 'any',
+  alert_value DECIMAL(10,2),
+  status TEXT NOT NULL DEFAULT 'watching',
+  on_sale_now BOOLEAN NOT NULL DEFAULT false,
+  last_sale_detected_at TIMESTAMPTZ,
+  dismissed_at TIMESTAMPTZ,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS shopping_prices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID NOT NULL REFERENCES shopping_items(id) ON DELETE CASCADE,
+  store TEXT NOT NULL,
+  product_name TEXT,
+  product_url TEXT,
+  price DECIMAL(10,2),
+  was_price DECIMAL(10,2),
+  on_special BOOLEAN NOT NULL DEFAULT false,
+  checked_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE shopping_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shopping_prices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON shopping_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON shopping_prices FOR ALL USING (true) WITH CHECK (true);

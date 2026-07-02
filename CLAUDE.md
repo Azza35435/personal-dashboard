@@ -31,8 +31,9 @@ No test suite is configured yet.
 - **`app/health/page.tsx`** — Health: GymWidget + NutritionWidget + CookbookWidget + AppleHealthWidget.
 - **`app/apple-health/page.tsx`** — Apple Health full tracker (AppleHealthTracker).
 - **`app/goals/page.tsx`** — Goals tracker (GoalsWidget): monthly / short-term / long-term goals grouped by editable categories, with milestones and a decision journal.
+- **`app/shopping/page.tsx`** — Shopping Waitlist (ShoppingWaitlistWidget): watched grocery/pharmacy items with per-item alert rules; "Check now" hits `/api/shopping/check` which scrapes store prices into `shopping_prices`.
 
-**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Goals, Notes, Curriculars, Deadlines.
+**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Goals, Shopping Waitlist, Notes, Curriculars, Deadlines. The Shopping Waitlist entry shows a green count badge of active sale alerts (fetched on every route change via `alertActive()` from `lib/shopping.ts`).
 
 All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
 
@@ -181,6 +182,15 @@ Full-page goals tracker at `/goals`. Dashboard summary at `components/dashboard/
 
 **`load` as `useCallback`**: depends on `tab`; re-fetches categories, goals for the active horizon, then milestones for all loaded goals.
 
+#### ShoppingWaitlistWidget (`components/widgets/ShoppingWaitlistWidget.tsx`)
+
+Full-page widget at `/shopping` (cyan left-border accent). Tracks items you're waiting to go on sale at Woolworths / Coles / Chemist Warehouse.
+
+- **Item fields**: name, optional `search_query` (keywords, defaults to name), optional exact product URL per store (`woolworths_url` / `coles_url` / `chemist_url`), alert rule (`alert_type`: `any` discount | `percent` ≥ N% off | `price` ≤ $N with `alert_value`), status (`watching` / `purchased`).
+- **Check now**: POSTs `/api/shopping/check`. The route warms up a Woolworths session (homepage GET → cookies), then per item either fetches `apis/ui/product/detail/{stockcode}` (stockcode parsed from `woolworths_url`) or POSTs `apis/ui/Search/products` and takes the first available result. Each check inserts a `shopping_prices` snapshot (price history) and updates `shopping_items.on_sale_now`; `last_sale_detected_at` is set only on a not-met → met transition, which is what re-triggers alerts after dismissal. **Only Woolworths is implemented** — Coles (Akamai bot protection) and Chemist Warehouse (fully client-rendered, private search API) checkers are planned; the route returns a `note` when items have URLs for those stores. Roadmap: manual button → Vercel cron + manual hybrid → scheduled Claude agent; email alerts later.
+- **Alert semantics** (`lib/shopping.ts`): `meetsRule()` evaluates a snapshot against the item's rule; `alertActive()` = watching + `on_sale_now` + not dismissed since the last sale detection. Dismiss sets `dismissed_at` (badge clears until a new sale is detected). Purchased pauses checking (route only fetches `status = 'watching'`) but keeps the item; "Watch again" reactivates.
+- **Layout**: header with last-checked timestamp + "+ Add item" + "Check now"; error banner (red) for per-item check failures, note banner (amber) for unsupported stores. Sections: 🔔 On sale (green cards) | 👀 Watching | ✓ Purchased (collapsed). Cards show latest price per store with was-price strikethrough + `-N%` badge; expanded view shows matched product link, lowest seen price, keywords, edit form (same fields as add), Purchased/Delete. Editing a rule re-evaluates `on_sale_now` against the latest snapshots client-side.
+
 #### WeekCalendar (`components/widgets/WeekCalendar.tsx`)
 
 - Shows events from **all Google Calendars** (not just primary) by first fetching `calendarList` then parallel-fetching events per calendar in `/api/calendar`.
@@ -191,7 +201,7 @@ Full-page goals tracker at `/goals`. Dashboard summary at `components/dashboard/
 
 ### Dashboard widgets (`components/dashboard/`)
 
-Six lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
+Seven lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
 
 - **`HeroWidget`**: Live ticking clock (1s interval), greeting by hour (Good morning/afternoon/evening/night), Melbourne location. Violet gradient background.
 - **`QuoteWidget`**: 36 curated quotes, one per day (`getDayOfYear % 36`). Amber gradient. No external API.
@@ -199,6 +209,7 @@ Six lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
 - **`TodayScheduleWidget`**: Fetches `/api/calendar` for today's date range. Shows unauthenticated state with "Connect Calendar" button. Uses `useSession` from next-auth.
 - **`PriorityTodosWidget`**: Todos where `priority = 'high'` OR `due_date = today`, not completed. Toggle-complete removes from list. Shows due-date badge.
 - **`GoalsWidget`** (`components/dashboard/GoalsWidget.tsx`): Monthly goals summary — current month + carried-over incomplete goals, each with a milestone progress bar. Links to `/goals` full tracker.
+- **`ShoppingWidget`** (`components/dashboard/ShoppingWidget.tsx`): "On Sale Now" — watching items with `on_sale_now = true`, each showing store, latest price and `-N%`. Links to `/shopping`.
 
 Each widget is a self-contained card with `rounded-2xl shadow` styling, `overflow-hidden`, and `flex flex-col` for header + scrollable body.
 
@@ -252,7 +263,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 ### Database schema
 
-Twenty-five Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Twenty-seven Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 **`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
@@ -454,6 +465,38 @@ CREATE TABLE IF NOT EXISTS goal_decisions (
 );
 ALTER TABLE goal_decisions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON goal_decisions FOR ALL USING (true) WITH CHECK (true);
+-- Shopping Waitlist tables (added for /shopping page):
+CREATE TABLE IF NOT EXISTS shopping_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  search_query TEXT,
+  woolworths_url TEXT,
+  coles_url TEXT,
+  chemist_url TEXT,
+  alert_type TEXT NOT NULL DEFAULT 'any',
+  alert_value DECIMAL(10,2),
+  status TEXT NOT NULL DEFAULT 'watching',
+  on_sale_now BOOLEAN NOT NULL DEFAULT false,
+  last_sale_detected_at TIMESTAMPTZ,
+  dismissed_at TIMESTAMPTZ,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS shopping_prices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID NOT NULL REFERENCES shopping_items(id) ON DELETE CASCADE,
+  store TEXT NOT NULL,
+  product_name TEXT,
+  product_url TEXT,
+  price DECIMAL(10,2),
+  was_price DECIMAL(10,2),
+  on_special BOOLEAN NOT NULL DEFAULT false,
+  checked_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE shopping_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shopping_prices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON shopping_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON shopping_prices FOR ALL USING (true) WITH CHECK (true);
 ```
 
 ## Environment variables

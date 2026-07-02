@@ -1,7 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { alertActive } from '@/lib/shopping'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: '◈' },
@@ -11,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/apple-health', label: 'Apple Health', icon: '♥' },
   { href: '/habits', label: 'Habits', icon: '✓' },
   { href: '/goals', label: 'Goals', icon: '🎯' },
+  { href: '/shopping', label: 'Shopping Waitlist', icon: '🛒' },
   { href: '/notes', label: 'Notes', icon: '📝' },
   { href: '/curriculars', label: 'Curriculars', icon: '🎓' },
   { href: '/deadlines', label: 'Deadlines', icon: '📅' },
@@ -18,6 +22,16 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const [saleCount, setSaleCount] = useState(0)
+
+  useEffect(() => {
+    supabase
+      .from('shopping_items')
+      .select('status, on_sale_now, dismissed_at, last_sale_detected_at')
+      .eq('status', 'watching')
+      .eq('on_sale_now', true)
+      .then(({ data }) => setSaleCount((data ?? []).filter(alertActive).length))
+  }, [pathname])
 
   return (
     <aside className="w-52 flex-shrink-0 h-screen sticky top-0 border-r border-border flex flex-col bg-sidebar">
@@ -42,7 +56,12 @@ export default function Sidebar() {
               }`}
             >
               <span className="text-base w-5 text-center">{item.icon}</span>
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.href === '/shopping' && saleCount > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-green-600 text-white text-[10px] font-semibold flex items-center justify-center">
+                  {saleCount}
+                </span>
+              )}
             </Link>
           )
         })}

@@ -214,6 +214,39 @@ export interface AppleHealthLog {
   updated_at: string
 }
 
+export type ShoppingStore = 'woolworths' | 'coles' | 'chemist'
+export type ShoppingAlertType = 'any' | 'percent' | 'price'
+export type ShoppingStatus = 'watching' | 'purchased'
+
+export interface ShoppingItem {
+  id: string
+  name: string
+  search_query: string | null
+  woolworths_url: string | null
+  coles_url: string | null
+  chemist_url: string | null
+  alert_type: ShoppingAlertType
+  alert_value: number | null
+  status: ShoppingStatus
+  on_sale_now: boolean
+  last_sale_detected_at: string | null
+  dismissed_at: string | null
+  position: number
+  created_at: string
+}
+
+export interface ShoppingPrice {
+  id: string
+  item_id: string
+  store: ShoppingStore
+  product_name: string | null
+  product_url: string | null
+  price: number | null
+  was_price: number | null
+  on_special: boolean
+  checked_at: string
+}
+
 export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 
 export interface CookbookRecipe {
