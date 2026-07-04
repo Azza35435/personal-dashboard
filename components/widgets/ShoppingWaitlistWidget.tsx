@@ -176,6 +176,11 @@ export default function ShoppingWaitlistWidget() {
       const json = await res.json()
       if (!res.ok) {
         setCheckErrors([{ item: '', store: '', error: json.error ?? `Check failed (${res.status})` }])
+      } else if (json.blocked) {
+        // Woolworths 403s the hosting server's IP — checks run from the Mac instead
+        setCheckNote(
+          'Woolworths blocks price checks from the cloud server, so the Check now button only works when running locally. Prices update automatically every morning at 9am from your Mac.'
+        )
       } else {
         setCheckErrors(json.errors ?? [])
         if (json.note) setCheckNote(json.note)

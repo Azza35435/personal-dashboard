@@ -185,12 +185,17 @@ export async function POST() {
   }
 
   const unsupported = (items ?? []).some((i: ShoppingItem) => i.coles_url || i.chemist_url)
+  // Every item bot-blocked → the server IP is blocked (typical on Vercel);
+  // the client shows a "checks run locally instead" note rather than errors.
+  const blocked =
+    errors.length > 0 && errors.length === (items ?? []).length && errors.every((e) => /\((403|429)\)/.test(e.error))
   return NextResponse.json({
     checkedAt: now,
     checked: results.length,
     onSale: results.filter((r) => r.met).length,
     results,
     errors,
+    blocked,
     ...(unsupported ? { note: 'Coles and Chemist Warehouse checking is not supported yet — only Woolworths prices were fetched.' } : {}),
   })
 }
