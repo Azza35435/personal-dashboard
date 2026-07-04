@@ -49,7 +49,9 @@ function WidgetShell({ id, children, onRemove }: { id: string; children: React.R
 }
 
 export default function DashboardPage() {
-  const { width, containerRef, mounted } = useContainerWidth()
+  // measureBeforeMount: the ref'd container must exist on the very first render
+  // (the hook only attaches its ResizeObserver once) — see conditional below.
+  const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true })
   const [layout, setLayout] = useState<LayoutItem[]>(DEFAULT_LAYOUT)
   const [layoutLoaded, setLayoutLoaded] = useState(false)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,20 +89,16 @@ export default function DashboardPage() {
     }, 800)
   }, [])
 
-  if (!layoutLoaded) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
-          <p className="text-sm text-gray-400">Loading dashboard…</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
-      {mounted && (
+    <div ref={containerRef} className="h-full overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
+      {!layoutLoaded || !mounted ? (
+        <div className="h-full flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+            <p className="text-sm text-gray-400">Loading dashboard…</p>
+          </div>
+        </div>
+      ) : (
           <GridLayout
             layout={layout as Layout}
             width={width}
