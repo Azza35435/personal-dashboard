@@ -14,6 +14,16 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+// Exact prices (groceries etc.) — formatCurrency rounds to whole dollars.
+export function formatPrice(amount: number): string {
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
   return date.toLocaleDateString('en-AU', { weekday: 'short', month: 'short', day: 'numeric' })

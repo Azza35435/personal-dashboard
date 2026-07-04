@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { discountPct, STORE_LABEL } from '@/lib/shopping'
 import type { ShoppingItem, ShoppingPrice, ShoppingStore } from '@/lib/types'
-import { formatCurrency } from '@/lib/utils'
+import { formatPrice } from '@/lib/utils'
 
 export default function ShoppingWidget() {
   const [items, setItems] = useState<ShoppingItem[]>([])
@@ -74,7 +74,7 @@ export default function ShoppingWidget() {
                 {price && (
                   <div className="text-right flex-shrink-0">
                     <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                      {price.price != null ? formatCurrency(price.price) : '—'}
+                      {price.price != null ? formatPrice(price.price) : '—'}
                     </p>
                     {pct != null && <p className="text-[10px] font-semibold text-green-600">-{pct}%</p>}
                   </div>

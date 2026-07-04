@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { alertActive, discountPct, meetsRule, STORE_LABEL } from '@/lib/shopping'
 import type { ShoppingAlertType, ShoppingItem, ShoppingPrice, ShoppingStore } from '@/lib/types'
-import { formatCurrency } from '@/lib/utils'
+import { formatPrice } from '@/lib/utils'
 
 const STORES: ShoppingStore[] = ['woolworths', 'coles', 'chemist']
 
@@ -60,7 +60,7 @@ function formToRow(form: ItemForm) {
 
 function ruleLabel(item: ShoppingItem): string {
   if (item.alert_type === 'percent' && item.alert_value != null) return `≥ ${item.alert_value}% off`
-  if (item.alert_type === 'price' && item.alert_value != null) return `under ${formatCurrency(item.alert_value)}`
+  if (item.alert_type === 'price' && item.alert_value != null) return `under ${formatPrice(item.alert_value)}`
   return 'any discount'
 }
 
@@ -273,10 +273,10 @@ export default function ShoppingWaitlistWidget() {
                 <div key={store} className="text-right">
                   <div className="flex items-baseline gap-1.5 justify-end">
                     {price.was_price != null && pct != null && (
-                      <span className="text-[10px] text-gray-400 line-through">{formatCurrency(price.was_price)}</span>
+                      <span className="text-[10px] text-gray-400 line-through">{formatPrice(price.was_price)}</span>
                     )}
                     <span className={`text-sm font-medium ${pct != null ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      {price.price != null ? formatCurrency(price.price) : '—'}
+                      {price.price != null ? formatPrice(price.price) : '—'}
                     </span>
                     {pct != null && (
                       <span className="text-[10px] font-semibold text-green-700 dark:text-green-400">-{pct}%</span>
@@ -325,7 +325,7 @@ export default function ShoppingWaitlistWidget() {
                       ) : (
                         <span className="truncate">{price.product_name}</span>
                       )}
-                      {low != null && <span className="flex-shrink-0 text-gray-400">lowest seen {formatCurrency(low)}</span>}
+                      {low != null && <span className="flex-shrink-0 text-gray-400">lowest seen {formatPrice(low)}</span>}
                     </div>
                   )
                 })}

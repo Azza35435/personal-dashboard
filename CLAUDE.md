@@ -244,7 +244,7 @@ Calendar API error messages include the HTTP status and Google's response body (
 ### Shared utilities
 
 - `lib/types.ts` — all TypeScript interfaces and union types including: `Account`, `Todo`, `Habit`, `Section`, `Curricular`, `CurricularDeadline`, `Subscription`, `IncomeStream`, `AppleHealthLog`, etc. Union types: `AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`, `BillingCycle`, `SubscriptionCategory`.
-- `lib/utils.ts` — `cn()` (clsx + tailwind-merge), `formatCurrency()` (AUD, `en-AU`), `formatDate()`, `formatTime()`, `isToday()`, `isPast()`
+- `lib/utils.ts` — `cn()` (clsx + tailwind-merge), `formatCurrency()` (AUD, `en-AU`, rounds to whole dollars — finance widgets), `formatPrice()` (AUD with cents — shopping prices), `formatDate()`, `formatTime()`, `isToday()`, `isPast()`
 - `types/next-auth.d.ts` — module augmentation to add `accessToken?: string` to the `Session` type
 
 ### Styling
