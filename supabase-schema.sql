@@ -263,3 +263,12 @@ ALTER TABLE shopping_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shopping_prices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON shopping_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON shopping_prices FOR ALL USING (true) WITH CHECK (true);
+
+-- Sidebar nav custom order (drag-to-reorder sidebar)
+CREATE TABLE IF NOT EXISTS sidebar_order (
+  href TEXT PRIMARY KEY,
+  position INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE sidebar_order ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON sidebar_order FOR ALL USING (true) WITH CHECK (true);

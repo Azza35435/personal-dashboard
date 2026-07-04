@@ -33,7 +33,7 @@ No test suite is configured yet.
 - **`app/goals/page.tsx`** — Goals tracker (GoalsWidget): monthly / short-term / long-term goals grouped by editable categories, with milestones and a decision journal.
 - **`app/shopping/page.tsx`** — Shopping Waitlist (ShoppingWaitlistWidget): watched grocery/pharmacy items with per-item alert rules; "Check now" hits `/api/shopping/check` which scrapes store prices into `shopping_prices`.
 
-**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Goals, Shopping Waitlist, Notes, Curriculars, Deadlines. The Shopping Waitlist entry shows a green count badge of active sale alerts (fetched on every route change via `alertActive()` from `lib/shopping.ts`).
+**Sidebar nav** (`components/Sidebar.tsx`): Dashboard, Schedule & Tasks, Finance, Health, Apple Health, Habits, Goals, Shopping Waitlist, Notes, Curriculars, Deadlines. The Shopping Waitlist entry shows a green count badge of active sale alerts (fetched on every route change via `alertActive()` from `lib/shopping.ts`). Nav items are **drag-to-reorder** (pointer-event pattern, 6px movement threshold so plain clicks still navigate; `didDragRef` suppresses the Link click after a drag). Dashboard is pinned at index 0 and not draggable; drops are clamped to index ≥ 1. Order persists to the `sidebar_order` Supabase table (href PK + position, upserted on drop); unknown/new NAV_ITEMS not in the table are appended in default order.
 
 All widgets are loaded via `dynamic(..., { ssr: false })` to prevent Supabase client instantiation during server-side prerendering.
 
@@ -265,7 +265,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 ### Database schema
 
-Twenty-seven Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
+Twenty-eight Supabase tables: `accounts`, `income_streams`, `todos`, `notes` (single row, id=1, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `sidebar_order`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Schema SQL is in `supabase-schema.sql`. RLS is enabled with open `"Allow all"` policies (single-user personal app).
 
 **`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
@@ -467,6 +467,14 @@ CREATE TABLE IF NOT EXISTS goal_decisions (
 );
 ALTER TABLE goal_decisions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON goal_decisions FOR ALL USING (true) WITH CHECK (true);
+-- Sidebar nav custom order (added for drag-to-reorder sidebar):
+CREATE TABLE IF NOT EXISTS sidebar_order (
+  href TEXT PRIMARY KEY,
+  position INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE sidebar_order ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON sidebar_order FOR ALL USING (true) WITH CHECK (true);
 -- Shopping Waitlist tables (added for /shopping page):
 CREATE TABLE IF NOT EXISTS shopping_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
