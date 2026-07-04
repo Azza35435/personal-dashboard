@@ -110,6 +110,7 @@ export default function HabitTracker() {
   const habitsRef    = useRef<Habit[]>([])
   const [popover, setPopover]           = useState<PopoverState | null>(null)
   const [popGrpName, setPopGrpName]     = useState('')
+  const [popHabitName, setPopHabitName] = useState('')
   const [delConfirm, setDelConfirm]     = useState<DeleteConfirm | null>(null)
   const [addingIn, setAddingIn]         = useState<string | null>(null) // gAttr value
   const [newHabitName, setNewHabitName] = useState('')
@@ -303,6 +304,12 @@ export default function HabitTracker() {
     const maxPos = groups.length ? Math.max(...groups.map(g => g.position)) : -1
     await supabase.from('habit_groups').insert({ name, position: maxPos + 1 })
     setAddingGrp(false); setNewGrpName(''); load()
+  }
+
+  const renameHabit = async (id: string, name: string) => {
+    if (!name.trim()) return
+    await supabase.from('habits').update({ name: name.trim() }).eq('id', id)
+    setPopover(null); load()
   }
 
   const renameGroup = async (id: string, name: string) => {
@@ -544,7 +551,7 @@ export default function HabitTracker() {
                         onClick={e => {
                           const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                           setPopover({ type: 'habit', id: h.id, top: r.bottom + 4, left: r.left - 120 })
-                          setDelConfirm(null)
+                          setPopHabitName(h.name); setDelConfirm(null)
                         }}
                         className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-[11px] transition"
                       >···</button>
@@ -794,6 +801,17 @@ export default function HabitTracker() {
           {/* habit popover */}
           {popover.type === 'habit' && popHabit && !delConfirm && (
             <div className="flex flex-col gap-2.5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Rename</p>
+                <div className="flex gap-1.5">
+                  <input
+                    className="flex-1 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 outline-none focus:border-violet-400 text-gray-900 dark:text-gray-100"
+                    value={popHabitName} onChange={e => setPopHabitName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameHabit(popHabit.id, popHabitName) }}
+                  />
+                  <button onClick={() => renameHabit(popHabit.id, popHabitName)} className="text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-2 py-1 rounded">Save</button>
+                </div>
+              </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Move to group</p>
                 <select

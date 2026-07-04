@@ -111,7 +111,7 @@ Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (ins
 - **Habit drag** (`habitDrag`/`habitDragRef`): `data-hdrop-gid` + `data-hdrop-idx` on every habit row in all 3 columns. Supports cross-group drops — removes from source group, inserts at dest at `overIndex`, persists `position` + `group_id`.
 - **Group drag** (`groupDrag`/`groupDragRef`): `⠿` on group header rows in Col 1. `data-gdrop-idx` on headers. Reorders named groups only; persists `position` to `habit_groups`.
 
-**Popovers**: `···` on habit rows → group picker (immediate reassign) + delete. `···` on group headers → rename input + delete. Delete group with habits → move-or-delete confirmation (`DeleteConfirm` state) with destination picker + "Also delete all habits" checkbox.
+**Popovers**: `···` on habit rows → rename input + group picker (immediate reassign) + delete. `···` on group headers → rename input + delete. Delete group with habits → move-or-delete confirmation (`DeleteConfirm` state) with destination picker + "Also delete all habits" checkbox.
 
 **Data**: `habit_groups` (ordered by position) + `habits` (active, ordered by position then created_at) + `habit_completions` for the viewed month. Completions keyed as `${habit_id}:${day}`. Multi-month trend loaded separately on mount. `load` depends on `[startDate, endDate]`.
 
