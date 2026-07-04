@@ -20,11 +20,28 @@ interface WowProduct {
   IsAvailable: boolean
 }
 
+// Akamai bot protection fingerprints more than the UA — send the full set of
+// headers a real Chrome navigation/XHR would, or datacenter IPs get 403'd.
+const CHROME_HINTS: Record<string, string> = {
+  'User-Agent': UA,
+  'Accept-Language': 'en-AU,en;q=0.9',
+  'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"macOS"',
+}
+
 // Woolworths' search/detail APIs reject cookieless requests intermittently,
 // so warm up a session against the homepage first.
 async function woolworthsCookies(): Promise<string> {
   const res = await fetch('https://www.woolworths.com.au/', {
-    headers: { 'User-Agent': UA },
+    headers: {
+      ...CHROME_HINTS,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Dest': 'document',
+      'Upgrade-Insecure-Requests': '1',
+    },
     cache: 'no-store',
   })
   const setCookies = res.headers.getSetCookie?.() ?? []
@@ -33,11 +50,14 @@ async function woolworthsCookies(): Promise<string> {
 
 function wowHeaders(cookie: string): Record<string, string> {
   return {
-    'User-Agent': UA,
+    ...CHROME_HINTS,
     Accept: 'application/json',
     'Content-Type': 'application/json',
     Origin: 'https://www.woolworths.com.au',
     Referer: 'https://www.woolworths.com.au/',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty',
     ...(cookie ? { Cookie: cookie } : {}),
   }
 }
@@ -91,12 +111,29 @@ export async function POST() {
     // proceed cookieless; individual requests may still succeed
   }
 
+  // One fresh-cookie retry per run when Woolworths blocks us (403/429).
+  let retriedBlock = false
+  const fetchProduct = async (item: ShoppingItem): Promise<WowProduct | null> => {
+    const stockcode = item.woolworths_url?.match(/productdetails\/(\d+)/)?.[1]
+    const attempt = () =>
+      stockcode
+        ? wowDetail(stockcode, cookie)
+        : wowSearch(item.search_query?.trim() || item.name, cookie)
+    try {
+      return await attempt()
+    } catch (e) {
+      const blocked = e instanceof Error && /\((403|429)\)/.test(e.message)
+      if (!blocked || retriedBlock) throw e
+      retriedBlock = true
+      await sleep(1200)
+      cookie = await woolworthsCookies().catch(() => cookie)
+      return attempt()
+    }
+  }
+
   for (const item of (items ?? []) as ShoppingItem[]) {
     try {
-      const stockcode = item.woolworths_url?.match(/productdetails\/(\d+)/)?.[1]
-      const product = stockcode
-        ? await wowDetail(stockcode, cookie)
-        : await wowSearch(item.search_query?.trim() || item.name, cookie)
+      const product = await fetchProduct(item)
 
       if (!product) {
         errors.push({ item: item.name, store: 'woolworths', error: 'No matching product found' })
@@ -138,7 +175,11 @@ export async function POST() {
 
       results.push({ item: item.name, price, wasPrice, onSpecial, met: newMet })
     } catch (e) {
-      errors.push({ item: item.name, store: 'woolworths', error: e instanceof Error ? e.message : String(e) })
+      let msg = e instanceof Error ? e.message : String(e)
+      if (/\((403|429)\)/.test(msg)) {
+        msg += ' — Woolworths bot protection blocked the server; wait a few minutes and try again'
+      }
+      errors.push({ item: item.name, store: 'woolworths', error: msg })
     }
     await sleep(250)
   }
