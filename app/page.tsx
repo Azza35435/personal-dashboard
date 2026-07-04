@@ -104,7 +104,7 @@ export default function DashboardPage() {
             width={width}
             gridConfig={GRID_CONFIG}
             dragConfig={{ enabled: true, handle: '.drag-handle' }}
-            resizeConfig={{ enabled: true, handles: ['se'] }}
+            resizeConfig={{ enabled: true, handles: ['se', 'sw', 'ne', 'nw'] }}
             onLayoutChange={onLayoutChange}
           >
             <div key="hero">
