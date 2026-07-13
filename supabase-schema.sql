@@ -1,4 +1,11 @@
 -- Run this SQL in your Supabase dashboard (SQL Editor)
+--
+-- NOTE: this file is the single-user BASE schema (open "Allow all" RLS,
+-- no user_id columns). The multi-account layer lives in migrations/ and
+-- must be run afterwards, in order:
+--   001-auth-foundation.sql  profiles, allowed_users invite gate
+--   002-per-user-data.sql    user_id + per-user RLS on every table below
+--   003-sidebar-prefs.sql    sidebar_prefs (replaces sidebar_order)
 
 CREATE TABLE accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -272,3 +279,103 @@ CREATE TABLE IF NOT EXISTS sidebar_order (
 );
 ALTER TABLE sidebar_order ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON sidebar_order FOR ALL USING (true) WITH CHECK (true);
+
+-- ── Tables created after this file was first written (previously only in
+-- ── CLAUDE.md / created directly in the dashboard) ──────────────────────
+
+CREATE TABLE IF NOT EXISTS habit_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE habit_groups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON habit_groups FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS gym_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  workout_type TEXT NOT NULL,
+  color TEXT DEFAULT 'blue',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS gym_template_exercises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  template_id UUID NOT NULL REFERENCES gym_templates(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  sets INTEGER,
+  reps INTEGER,
+  weight_kg DECIMAL(6,2),
+  position INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE gym_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gym_template_exercises ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_templates FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON gym_template_exercises FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS curricular_deadlines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curricular_id UUID NOT NULL REFERENCES curriculars(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  module TEXT,
+  due_date DATE NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'medium',
+  completed BOOLEAN NOT NULL DEFAULT false,
+  todo_id UUID REFERENCES todos(id) ON DELETE SET NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE curricular_deadlines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON curricular_deadlines FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+  next_payment_date DATE,
+  category TEXT NOT NULL DEFAULT 'personal',
+  curricular_id UUID REFERENCES curriculars(id) ON DELETE SET NULL,
+  notes TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  payment_type TEXT NOT NULL DEFAULT 'subscription',
+  is_recurring BOOLEAN NOT NULL DEFAULT true,
+  paid BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON subscriptions FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS dashboard_layout (
+  widget_id TEXT PRIMARY KEY,
+  x INTEGER NOT NULL DEFAULT 0,
+  y INTEGER NOT NULL DEFAULT 0,
+  w INTEGER NOT NULL DEFAULT 4,
+  h INTEGER NOT NULL DEFAULT 4,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE dashboard_layout ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON dashboard_layout FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS apple_health_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date DATE NOT NULL UNIQUE,
+  steps INTEGER,
+  active_energy_kcal DECIMAL(8,2),
+  resting_hr DECIMAL(5,2),
+  hrv_ms DECIMAL(6,2),
+  sleep_total_min INTEGER,
+  sleep_deep_min INTEGER,
+  sleep_rem_min INTEGER,
+  sleep_core_min INTEGER,
+  sleep_awake_min INTEGER,
+  blood_oxygen_pct DECIMAL(5,2),
+  respiratory_rate DECIMAL(5,2),
+  vo2_max DECIMAL(5,2),
+  exercise_min INTEGER,
+  stand_hours INTEGER,
+  weight_kg DECIMAL(6,2),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE apple_health_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON apple_health_logs FOR ALL USING (true) WITH CHECK (true);

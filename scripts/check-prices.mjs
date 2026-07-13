@@ -29,9 +29,15 @@ const env = Object.fromEntries(
 )
 
 const SUPA = env.NEXT_PUBLIC_SUPABASE_URL
+// Service role required since per-user RLS: the anon key sees zero rows
+// without a signed-in session.
+const SUPA_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('Warning: SUPABASE_SERVICE_ROLE_KEY not set — falling back to anon key, which finds no items under RLS')
+}
 const SUPA_HEADERS = {
-  apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  Authorization: `Bearer ${env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+  apikey: SUPA_KEY,
+  Authorization: `Bearer ${SUPA_KEY}`,
   'Content-Type': 'application/json',
 }
 
@@ -164,6 +170,7 @@ for (const item of items) {
 
     await supaWrite('POST', 'shopping_prices', {
       item_id: item.id,
+      user_id: item.user_id, // service role bypasses the auth.uid() default
       store: 'woolworths',
       product_name: product.DisplayName || product.Name,
       product_url: productUrl,

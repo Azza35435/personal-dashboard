@@ -10,10 +10,10 @@ export default function NotesWidget() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // RLS scopes this to the signed-in user's single row
     supabase
       .from('notes')
       .select('*')
-      .eq('id', 1)
       .maybeSingle()
       .then(({ data }) => {
         setContent(data?.content ?? '')
@@ -24,7 +24,7 @@ export default function NotesWidget() {
   const save = async (val: string) => {
     await supabase
       .from('notes')
-      .upsert({ id: 1, content: val, updated_at: new Date().toISOString() })
+      .upsert({ content: val, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
     setSaved(true)
   }
 

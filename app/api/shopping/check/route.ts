@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-server'
 import { meetsRule } from '@/lib/shopping'
 import type { ShoppingItem } from '@/lib/types'
 
@@ -92,6 +92,18 @@ async function wowDetail(stockcode: string, cookie: string): Promise<WowProduct 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export async function POST() {
+  // Service role: the checker spans every user's watched items and runs
+  // without a session (RLS would otherwise scope it to the caller).
+  let supabase: ReturnType<typeof supabaseAdmin>
+  try {
+    supabase = supabaseAdmin()
+  } catch {
+    return NextResponse.json(
+      { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured on the server' },
+      { status: 500 }
+    )
+  }
+
   const { data: items, error } = await supabase
     .from('shopping_items')
     .select('*')
@@ -161,6 +173,7 @@ export async function POST() {
 
       await supabase.from('shopping_prices').insert({
         item_id: item.id,
+        user_id: item.user_id, // service role bypasses the auth.uid() default
         store: 'woolworths',
         product_name: product.DisplayName || product.Name,
         product_url: productUrl,

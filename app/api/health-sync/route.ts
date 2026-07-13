@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +17,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
+  // The iOS shortcut authenticates with a shared secret, not a user session,
+  // so rows are stamped with the admin's (Aaron's) user id.
+  const supabase = supabaseAdmin()
+  const { data: admin } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('is_admin', true)
+    .limit(1)
+    .maybeSingle()
+  if (!admin) return NextResponse.json({ error: 'No admin profile found' }, { status: 500 })
+
   const raw = body as Record<string, unknown>
   const records: unknown[] = Array.isArray(raw.records) ? raw.records : [raw]
 
@@ -24,6 +35,7 @@ export async function POST(req: NextRequest) {
     .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
     .filter(r => typeof r.date === 'string' && r.date)
     .map(r => ({
+      user_id: admin.id as string,
       date: r.date as string,
       steps: (r.steps as number) ?? null,
       active_energy_kcal: (r.active_energy_kcal as number) ?? null,
@@ -49,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabase
     .from('apple_health_logs')
-    .upsert(rows, { onConflict: 'date' })
+    .upsert(rows, { onConflict: 'user_id,date' })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

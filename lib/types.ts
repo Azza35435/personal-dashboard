@@ -220,6 +220,7 @@ export type ShoppingStatus = 'watching' | 'purchased'
 
 export interface ShoppingItem {
   id: string
+  user_id: string
   name: string
   search_query: string | null
   woolworths_url: string | null
@@ -245,6 +246,22 @@ export interface ShoppingPrice {
   was_price: number | null
   on_special: boolean
   checked_at: string
+}
+
+export interface Profile {
+  id: string
+  email: string
+  display_name: string | null
+  avatar_url: string | null
+  is_admin: boolean
+  created_at: string
+}
+
+export interface SidebarPref {
+  href: string
+  position: number
+  hidden: boolean
+  custom_label: string | null
 }
 
 export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'

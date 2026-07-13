@@ -83,7 +83,7 @@ export default function DashboardPage() {
           supabase.from('dashboard_layout').upsert({
             widget_id: item.i,
             x: item.x, y: item.y, w: item.w, h: item.h,
-          }, { onConflict: 'widget_id' })
+          }, { onConflict: 'user_id,widget_id' })
         )
       )
     }, 800)
