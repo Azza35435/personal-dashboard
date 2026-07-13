@@ -5,26 +5,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { alertActive } from '@/lib/shopping'
-import SidebarSettings, { type NavEntry } from '@/components/SidebarSettings'
-
-const NAV_ITEMS: NavEntry[] = [
-  { href: '/', label: 'Dashboard', icon: '◈' },
-  { href: '/schedule', label: 'Schedule & Tasks', icon: '📅' },
-  { href: '/finance', label: 'Finance', icon: '💰' },
-  { href: '/health', label: 'Health', icon: '💪' },
-  { href: '/apple-health', label: 'Apple Health', icon: '♥' },
-  { href: '/habits', label: 'Habits', icon: '✓' },
-  { href: '/goals', label: 'Goals', icon: '🎯' },
-  { href: '/shopping', label: 'Shopping Waitlist', icon: '🛒' },
-  { href: '/notes', label: 'Notes', icon: '📝' },
-  { href: '/curriculars', label: 'Curriculars', icon: '🎓' },
-  { href: '/deadlines', label: 'Deadlines', icon: '📅' },
-]
-
-interface Pref {
-  hidden: boolean
-  custom_label: string | null
-}
+import {
+  NAV_ITEMS,
+  PREFS_CHANGED_EVENT,
+  loadSidebarPrefs,
+  persistSidebarPrefs,
+  type NavEntry,
+  type PrefState,
+} from '@/lib/sidebarPrefs'
 
 interface NavDrag {
   href: string
@@ -40,8 +28,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const [saleCount, setSaleCount] = useState(0)
   const [order, setOrder] = useState<NavEntry[]>(NAV_ITEMS) // full order incl. hidden, Dashboard first
-  const [prefs, setPrefs] = useState<Record<string, Pref>>({})
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [prefs, setPrefs] = useState<Record<string, PrefState>>({})
   const [drag, setDrag] = useState<NavDrag | null>(null)
   const dragRef = useRef<NavDrag | null>(null)
   const didDragRef = useRef(false)
@@ -58,42 +45,22 @@ export default function Sidebar() {
   }, [pathname])
 
   useEffect(() => {
-    supabase.from('sidebar_prefs').select('href, position, hidden, custom_label').then(({ data }) => {
-      if (!data || data.length === 0) return
-      const rows = new Map(data.map(r => [r.href, r]))
-      const known = NAV_ITEMS.filter(i => rows.has(i.href)).sort(
-        (a, b) => rows.get(a.href)!.position - rows.get(b.href)!.position
-      )
-      const unknown = NAV_ITEMS.filter(i => !rows.has(i.href))
-      setOrder([NAV_ITEMS[0], ...known.filter(i => i.href !== '/'), ...unknown.filter(i => i.href !== '/')])
-      const p: Record<string, Pref> = {}
-      for (const r of data) p[r.href] = { hidden: !!r.hidden, custom_label: r.custom_label ?? null }
-      setPrefs(p)
-    })
+    const load = () =>
+      loadSidebarPrefs().then(({ order, prefs }) => {
+        setOrder(order)
+        setPrefs(prefs)
+      })
+    load()
+    // Stay in sync with edits made on the /settings page
+    const onChange = () => {
+      if (!dragRef.current) load()
+    }
+    window.addEventListener(PREFS_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(PREFS_CHANGED_EVENT, onChange)
   }, [])
-
-  const persist = (fullOrder: NavEntry[], p: Record<string, Pref>) => {
-    supabase
-      .from('sidebar_prefs')
-      .upsert(
-        fullOrder.map((i, idx) => ({
-          href: i.href,
-          position: idx,
-          hidden: i.href === '/' ? false : !!p[i.href]?.hidden,
-          custom_label: p[i.href]?.custom_label ?? null,
-        })),
-        { onConflict: 'user_id,href' }
-      )
-      .then(() => {})
-  }
 
   // Rebuild the full order after a drag reordered the visible list: hidden
   // items keep their relative order, tucked at the end.
-  const rebuildOrder = (newVisible: NavEntry[]) => {
-    const hiddenItems = order.filter(i => i.href !== '/' && prefs[i.href]?.hidden)
-    return [...newVisible, ...hiddenItems]
-  }
-
   const commitDrop = (d: NavDrag) => {
     const from = d.captured.findIndex(i => i.href === d.href)
     if (from === -1 || d.overIndex === null) return
@@ -104,9 +71,10 @@ export default function Sidebar() {
     const nextVisible = [...d.captured]
     const [moved] = nextVisible.splice(from, 1)
     nextVisible.splice(to, 0, moved)
-    const next = rebuildOrder(nextVisible)
+    const hiddenItems = order.filter(i => i.href !== '/' && prefs[i.href]?.hidden)
+    const next = [...nextVisible, ...hiddenItems]
     setOrder(next)
-    persist(next, prefs)
+    persistSidebarPrefs(next, prefs)
   }
 
   useEffect(() => {
@@ -143,38 +111,6 @@ export default function Sidebar() {
       window.removeEventListener('pointerup', up)
     }
   }, [!!drag]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleHidden = (href: string) => {
-    const cur = prefs[href]
-    const next = { ...prefs, [href]: { hidden: !cur?.hidden, custom_label: cur?.custom_label ?? null } }
-    setPrefs(next)
-    persist(order, next)
-  }
-
-  const rename = (href: string, label: string) => {
-    const item = NAV_ITEMS.find(i => i.href === href)
-    const custom = label && label !== item?.label ? label : null
-    const cur = prefs[href]
-    const next = { ...prefs, [href]: { hidden: !!cur?.hidden, custom_label: custom } }
-    setPrefs(next)
-    persist(order, next)
-  }
-
-  const move = (href: string, dir: -1 | 1) => {
-    const idx = order.findIndex(i => i.href === href)
-    const to = idx + dir
-    if (idx <= 0 || to <= 0 || to >= order.length) return
-    const next = [...order]
-    ;[next[idx], next[to]] = [next[to], next[idx]]
-    setOrder(next)
-    persist(next, prefs)
-  }
-
-  const reset = async () => {
-    setOrder(NAV_ITEMS)
-    setPrefs({})
-    await supabase.from('sidebar_prefs').delete().neq('href', '')
-  }
 
   const gapAt = drag?.active ? drag.overIndex : null
 
@@ -249,25 +185,18 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-3 border-t border-border">
-        <button
-          onClick={() => setSettingsOpen(o => !o)}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-colors"
+        <Link
+          href="/settings"
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors select-none ${
+            pathname.startsWith('/settings')
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+              : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
+          }`}
         >
           <span className="text-base w-5 text-center">⚙</span>
           <span>Settings</span>
-        </button>
+        </Link>
       </div>
-
-      <SidebarSettings
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        items={order}
-        prefs={prefs}
-        onToggleHidden={toggleHidden}
-        onRename={rename}
-        onMove={move}
-        onReset={reset}
-      />
     </aside>
   )
 }
