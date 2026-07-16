@@ -52,15 +52,14 @@ The app is multi-account: invite-only Google sign-in via **Supabase Auth**, per-
 - **`app/login/page.tsx`**: Google sign-in button (`signInWithOAuth` → `/auth/callback` PKCE exchange in `app/auth/callback/route.ts`). Shows a friendly "not invited" state — Supabase surfaces the allowlist trigger's rejection as `Database error saving new user`.
 - **Invite gate**: `allowed_users` table (email PK, `is_admin` flag) + an `AFTER INSERT` trigger on `auth.users` that raises unless the email is allowlisted, and auto-creates the `profiles` row (id = auth uid, email, display_name, avatar_url, is_admin copied from the invite).
 - **RLS**: every data table has `user_id UUID NOT NULL DEFAULT auth.uid()` and an `"Own rows"` policy (`user_id = auth.uid()`), so widget inserts need no code changes. Service-role inserts **must stamp `user_id` explicitly** (the default evaluates to NULL without a session) — see the shopping check route and health-sync route.
-- **Migrations** live in `migrations/` and must be run in order in the Supabase SQL editor: `001-auth-foundation.sql` (profiles/allowlist — run, then sign in once), `002-per-user-data.sql` (user_id + RLS on all tables, backfills to the owner by email lookup), `003-sidebar-prefs.sql` (per-user sidebar prefs, drops `sidebar_order`).
+- **Migrations** live in `migrations/` and must be run in order in the Supabase SQL editor: `001-auth-foundation.sql` (profiles/allowlist — run, then sign in once), `002-per-user-data.sql` (user_id + RLS on all tables, backfills to the owner by email lookup), `003-sidebar-prefs.sql` (per-user sidebar prefs, drops `sidebar_order`), `004-google-tokens.sql` (per-user Google Calendar tokens).
 - **Table quirks after 002**: `notes` is one row per user (PK `user_id`, the old `id=1` column is gone); `dashboard_layout` PK is `(user_id, widget_id)`; `apple_health_logs` unique key is `(user_id, date)` — health-sync stamps the admin profile's id since the iOS shortcut authenticates with a shared secret.
-- **NextAuth still exists in parallel** for Google Calendar only (Phase 4 will retire it in favour of Supabase provider tokens).
+- **NextAuth is fully retired** (Phase 4, 2026-07): one Google consent at sign-in covers both login and calendar. Nothing imports `next-auth`; there is no SessionProvider.
 
 ### Data flow
 
 - **Supabase** (`lib/supabase.ts`): single shared browser client (see Auth section), initialized from `NEXT_PUBLIC_SUPABASE_*` env vars. Every widget fetches and mutates its own table directly — there is no global state or context. Pattern is: `useEffect` → `supabase.from(...).select(...)`, re-fetch after every mutation via a local `load()` function. RLS scopes all reads/writes to the signed-in user automatically.
-- **Google Calendar**: `next-auth` v4 with Google provider stores `accessToken` in the JWT/session. The `/api/calendar` route uses `getServerSession(authOptions)` to retrieve it and proxies calls to the Google Calendar API. `authOptions` is exported from the auth route and imported by the calendar route. The auth route requests `calendar.readonly` scope with `access_type: offline` and `prompt: consent`. Expired tokens are automatically refreshed via the stored `refreshToken` in the JWT callback.
-- **Session**: `SessionProviderWrapper` (a thin `'use client'` wrapper around NextAuth's `SessionProvider`) is mounted in `app/layout.tsx` so `useSession()` works in all widgets.
+- **Google Calendar** (per user, via Supabase provider tokens): sign-in (`app/login/page.tsx`) requests the `calendar.readonly` scope with `access_type: offline` + `prompt: consent`; `/auth/callback` stores the returned `provider_refresh_token` (+ initial `provider_token`) in the user's `google_tokens` row. `/api/calendar` identifies the caller via the cookie session, reads their `google_tokens` row (RLS: own row), refreshes the access token against `oauth2.googleapis.com/token` when expired (cached back into the row; `invalid_grant` deletes the row so the UI re-offers Connect), then fans out to `calendarList` + per-calendar events exactly as before. Client state lives in `lib/useCalendarConnection.ts` — `useCalendarConnection()` returns `{ status: loading|connected|disconnected, connected, connect, disconnect }` where connected = own `google_tokens` row exists, `connect()` re-runs `signInWithOAuth` with the calendar scope (redirect back via `?next=`), `disconnect()` deletes the row. Used by `WeekCalendar`, `TodayScheduleWidget`, and the Settings Account tab.
 
 ### Widget structure
 
@@ -241,23 +240,19 @@ The bento grid in `app/page.tsx`:
 - Resize: all four corner handles (`resizeConfig.handles: ['se','sw','ne','nw']`). Per-corner CSS in `globals.css` positions/rotates the shared corner glyph; handles have `z-index: 20` so the top corners sit above the `z-10` drag-handle strip (react-grid-layout's internal `cancel: '.react-resizable-handle'` keeps handle clicks from starting a drag).
 - CSS for react-grid-layout is inlined in `app/globals.css` (not imported from node_modules).
 
-### Google Calendar auth setup checklist
+### Google auth setup checklist (Supabase Auth era)
 
-Common failure modes and their fixes (all must be true for sign-in to work):
+Common failure modes and their fixes:
 
-1. **`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set in Vercel** — missing env vars cause immediate Google rejection with no account chooser. Verify at `/api/debug-auth`.
-2. **Authorized redirect URI in Google Cloud Console** — must include exactly `https://<your-domain>/api/auth/callback/google`. Mismatch shows `Error 400: redirect_uri_mismatch`. Must be the **stable production URL**, not a preview deployment URL.
-3. **`calendar.readonly` scope added to OAuth consent screen** — must be explicitly added under "Scopes" in the consent screen editor, not just in code.
-4. **Google Calendar API enabled** — APIs & Services → Enabled APIs → Google Calendar API.
-5. **Test user email added and saved** — in OAuth consent screen → Test users, type email then press Enter before clicking Save.
-6. **`NEXTAUTH_URL` set to stable production URL** — not a preview deployment URL.
-7. **Stale token / "Failed to fetch calendar list"** — if the calendar shows this error after signing in, the session token was issued before scopes were fully configured. Fix: click **Disconnect** in the calendar widget, then sign in again. The `prompt: consent` in `authOptions` forces Google to re-issue a fresh token with all current scopes.
-8. **403 insufficient scopes after reconnecting / app not in Google permissions** — the NextAuth JWT cookie persists the old token even after "Disconnect". Full fix: (a) clear all cookies for the Vercel domain in browser DevTools → Application → Cookies, OR go to `https://myaccount.google.com/permissions`, find the app and click **Remove Access**, then sign in fresh. Simply clicking Disconnect in the widget is not enough when the token is deeply stale or was issued without the calendar scope.
-9. **Recurring 401s roughly weekly / app missing from `myaccount.google.com/permissions`** — while the OAuth consent screen is in **Testing** mode, Google expires refresh tokens after **7 days** and drops the grant from the permissions page (so there is nothing to "Remove Access" on — clear the Vercel-domain cookies instead, per item 8a). Permanent fix: OAuth consent screen → **Publish app** (In production). Verification is not required for personal use — accept the "unverified app" warning once via Advanced → Continue. After publishing, refresh tokens no longer expire.
-10. **403 insufficient scopes immediately after a fresh, successful sign-in** — Google's granular-consent screen shows a per-scope checkbox list ("Select what this app can access") and the Calendar checkbox can be unticked by default; pressing Continue then grants sign-in only. Fix: remove access at `myaccount.google.com/permissions` (the grant *will* appear after a fresh sign-in), Disconnect, sign in again and explicitly tick **"See and download any calendar…"** before continuing. (Diagnostic: 401 = dead/stale token; 403 = valid token missing the calendar scope.)
+1. **Google provider enabled in Supabase** — Authentication → Sign In / Providers → Google, with `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` pasted in and saved. Clicking "Continue with Google" without this returns `{"error_code":"validation_failed","msg":"Unsupported provider: provider is not enabled"}`.
+2. **Authorized redirect URI in Google Cloud Console** — must include exactly `https://<project-ref>.supabase.co/auth/v1/callback` (Supabase shows this URL in the provider panel).
+3. **Supabase redirect URLs** — Auth → URL Configuration must allowlist `http://localhost:3000/auth/callback` and the production `/auth/callback`; Site URL = production URL. Missing entries bounce sign-ins to the Site URL with no session.
+4. **`calendar.readonly` scope on the OAuth consent screen** — explicitly added under "Scopes", not just requested in code.
+5. **Google Calendar API enabled** — APIs & Services → Enabled APIs → Google Calendar API.
+6. **Consent screen published** ("In production") — in **Testing** mode Google expires refresh tokens after **7 days**, which now surfaces as the calendar silently disconnecting weekly (`invalid_grant` → `google_tokens` row deleted → Connect button reappears). Verification isn't required for personal use — accept the "unverified app" warning via Advanced → Continue.
+7. **Calendar shows Connect even though you just signed in** — Google's granular-consent screen ("Select what this app can access") can leave the Calendar checkbox unticked; Google then returns no calendar grant, `/auth/callback` still stores the refresh token, and calendar calls 403. Fix: Settings → Account → **Connect calendar** (forces a fresh consent — tick "See and download any calendar…"). If Google stops showing the checkbox at all, remove the app at `myaccount.google.com/permissions` first. (Diagnostic: 401 `notConnected` = no/dead token row; 403 from Google = token valid but missing the calendar scope.)
+8. **"not invited" at sign-in** — email missing from `allowed_users`; add it via Settings → Admin → Invite (the signup trigger rejects non-allowlisted emails as `Database error saving new user`).
 
-Debug endpoint: `GET /api/debug-auth` returns which env vars are set and the exact `redirect_uri` being sent to Google.
-Custom error page: `app/auth/error/page.tsx` shows the actual NextAuth error code (configured via `pages: { error: '/auth/error' }` in `authOptions`).
 Calendar API error messages include the HTTP status and Google's response body (e.g. `Failed to fetch calendar list (401): Invalid Credentials`).
 
 ### Shared utilities
@@ -286,7 +281,7 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 
 ### Database schema
 
-Thirty-two Supabase tables: `profiles`, `allowed_users`, `accounts`, `income_streams`, `todos`, `notes` (one row per user, PK `user_id`, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `cookbook_recipes`, `apple_health_logs`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `sidebar_prefs`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Base (single-user) schema SQL is in `supabase-schema.sql`; the multi-account layer (user_id columns, per-user RLS, profiles/allowlist/sidebar_prefs) is applied by `migrations/001..003` — see the Auth section. All data tables have per-user `"Own rows"` RLS policies.
+Thirty-three Supabase tables: `profiles`, `allowed_users`, `google_tokens`, `accounts`, `income_streams`, `todos`, `notes` (one row per user, PK `user_id`, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `cookbook_recipes`, `apple_health_logs`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `sidebar_prefs`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Base (single-user) schema SQL is in `supabase-schema.sql`; the multi-account layer (user_id columns, per-user RLS, profiles/allowlist/sidebar_prefs) is applied by `migrations/001..003` — see the Auth section. All data tables have per-user `"Own rows"` RLS policies.
 
 **`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
@@ -535,12 +530,12 @@ CREATE POLICY "Allow all" ON shopping_prices FOR ALL USING (true) WITH CHECK (tr
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=   # server-only: price checker + health sync (bypasses RLS)
-GOOGLE_CLIENT_ID=
+SUPABASE_SERVICE_ROLE_KEY=   # server-only: price checker + health sync + admin member removal (bypasses RLS)
+GOOGLE_CLIENT_ID=            # used by /api/calendar to refresh Google access tokens
 GOOGLE_CLIENT_SECRET=
-NEXTAUTH_URL=https://<your-vercel-domain>   # e.g. https://personal-dashboard-sooty-eight.vercel.app
-NEXTAUTH_SECRET=        # openssl rand -base64 32
 ```
+
+(`NEXTAUTH_URL`/`NEXTAUTH_SECRET` are retired — NextAuth was removed in Phase 4.)
 
 Supabase Auth also needs dashboard config: Google provider enabled (same client id/secret; Supabase's `/auth/v1/callback` URL added to the Google OAuth client), and `http://localhost:3000/auth/callback` + the production `/auth/callback` in Auth → URL Configuration → Redirect URLs.
 

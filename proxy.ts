@@ -2,9 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 // Paths reachable without a Supabase session. /api/health-sync has its own
-// bearer-secret gate (called by the iOS shortcut, no cookies); /api/auth is
-// NextAuth's Google Calendar flow (retired in a later phase).
-const PUBLIC_PREFIXES = ['/login', '/auth', '/api/auth', '/api/health-sync', '/api/debug-auth']
+// bearer-secret gate (called by the iOS shortcut, no cookies).
+const PUBLIC_PREFIXES = ['/login', '/auth', '/api/health-sync']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })

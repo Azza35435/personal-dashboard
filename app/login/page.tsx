@@ -17,10 +17,16 @@ function LoginInner() {
 
   const signIn = async () => {
     setSigningIn(true)
+    // Calendar scope requested up front so one consent powers both login and
+    // the Schedule widgets (offline access → refresh token captured by the
+    // callback). Google shows it as an optional checkbox; unticking it just
+    // leaves the calendar disconnected until they reconnect from Settings.
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+        queryParams: { access_type: 'offline', prompt: 'consent' },
       },
     })
   }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useCalendarConnection } from '@/lib/useCalendarConnection'
 import type { CalendarEvent } from '@/lib/types'
 
 const EVENT_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899']
@@ -11,13 +11,13 @@ function fmtTime(iso: string) {
 }
 
 export default function TodayScheduleWidget() {
-  const { data: session, status } = useSession()
+  const { connected, status, connect } = useCalendarConnection()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!session) return
+    if (!connected) return
     setLoading(true)
     setError(null)
     const today = new Date()
@@ -37,7 +37,7 @@ export default function TodayScheduleWidget() {
         setLoading(false)
       })
       .catch(err => { setError(String(err)); setLoading(false) })
-  }, [session])
+  }, [connected])
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -49,33 +49,33 @@ export default function TodayScheduleWidget() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {status === 'unauthenticated' && (
+        {status === 'disconnected' && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <p className="text-xs text-gray-400">Connect Google Calendar to see today's events</p>
             <button
-              onClick={() => signIn('google')}
+              onClick={() => connect()}
               className="text-xs px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-medium transition"
             >
               Connect Calendar
             </button>
           </div>
         )}
-        {status === 'authenticated' && loading && (
+        {connected && loading && (
           <div className="space-y-2.5 pt-1">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-12 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
             ))}
           </div>
         )}
-        {status === 'authenticated' && !loading && error && (
+        {connected && !loading && error && (
           <p className="text-xs text-red-400 pt-2">{error}</p>
         )}
-        {status === 'authenticated' && !loading && !error && events.length === 0 && (
+        {connected && !loading && !error && events.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-gray-400">No events today</p>
           </div>
         )}
-        {status === 'authenticated' && !loading && !error && events.length > 0 && (
+        {connected && !loading && !error && events.length > 0 && (
           <div className="space-y-2 pt-1">
             {events.map((event, idx) => {
               const color = EVENT_COLORS[idx % EVENT_COLORS.length]

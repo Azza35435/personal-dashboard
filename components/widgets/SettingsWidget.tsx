@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSession, signIn as googleSignIn, signOut as googleSignOut } from 'next-auth/react'
+import { useCalendarConnection } from '@/lib/useCalendarConnection'
 import { supabase } from '@/lib/supabase'
 import {
   NAV_ITEMS,
@@ -525,7 +525,7 @@ function FinancePinCard() {
 /* ───────────────────────── Account tab ───────────────────────── */
 
 function AccountTab({ profile }: { profile: Profile | null }) {
-  const { data: session, status } = useSession()
+  const { connected, status, connect, disconnect } = useCalendarConnection()
 
   const signOutEverywhere = async () => {
     await supabase.auth.signOut()
@@ -569,17 +569,18 @@ function AccountTab({ profile }: { profile: Profile | null }) {
       <div className={cardCls}>
         <p className={labelCls}>Google Calendar</p>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 mb-3">
-          Powers the Schedule widgets. Connected separately from your login for now.
+          Powers the Schedule widgets. Granted as part of your Google sign-in — reconnect here if you skipped the
+          calendar checkbox on the consent screen.
         </p>
         {status === 'loading' ? (
           <div className="h-8 animate-pulse bg-gray-100 dark:bg-gray-800 rounded w-48" />
-        ) : session?.accessToken ? (
+        ) : connected ? (
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
               <span className="w-2 h-2 rounded-full bg-green-500" /> Connected
-              {session.user?.email && <span className="text-gray-400 dark:text-gray-500">· {session.user.email}</span>}
+              {profile?.email && <span className="text-gray-400 dark:text-gray-500">· {profile.email}</span>}
             </span>
-            <button onClick={() => googleSignOut({ redirect: false })} className={ghostBtnCls}>
+            <button onClick={() => disconnect()} className={ghostBtnCls}>
               Disconnect
             </button>
           </div>
@@ -588,7 +589,7 @@ function AccountTab({ profile }: { profile: Profile | null }) {
             <span className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
               <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600" /> Not connected
             </span>
-            <button onClick={() => googleSignIn('google')} className={primaryBtnCls}>
+            <button onClick={() => connect()} className={primaryBtnCls}>
               Connect calendar
             </button>
           </div>

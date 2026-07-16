@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useSession, signIn, signOut } from 'next-auth/react'
+import { useCalendarConnection } from '@/lib/useCalendarConnection'
 import type { CalendarEvent } from '@/lib/types'
 
 const START_HOUR = 7
@@ -46,7 +46,7 @@ function getEventPos(event: CalendarEvent, weekDays: Date[], hourHeight: number)
 }
 
 export default function WeekCalendar() {
-  const { data: session, status } = useSession()
+  const { connected, status, connect, disconnect } = useCalendarConnection()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [calError, setCalError] = useState<string | null>(null)
@@ -64,7 +64,7 @@ export default function WeekCalendar() {
   })()
 
   const fetchEvents = () => {
-    if (!session) return
+    if (!connected) return
     setLoading(true)
     setCalError(null)
     const start = weekDays[0].toISOString()
@@ -86,15 +86,15 @@ export default function WeekCalendar() {
   useEffect(() => {
     fetchEvents()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, weekOffset])
+  }, [connected, weekOffset])
 
   // Auto-refresh every 5 minutes when viewing the current week
   useEffect(() => {
-    if (!session || weekOffset !== 0) return
+    if (!connected || weekOffset !== 0) return
     const interval = setInterval(fetchEvents, 5 * 60 * 1000)
     return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, weekOffset])
+  }, [connected, weekOffset])
 
   // Measure grid container and compute hourHeight so the grid fills without scrolling
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function WeekCalendar() {
     ? weekDays[0].toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
     : `${weekDays[0].toLocaleDateString('en-AU', { month: 'short' })} – ${weekDays[6].toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}`
 
-  if (status === 'unauthenticated') {
+  if (status === 'disconnected') {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
         <span className="text-5xl">📅</span>
@@ -125,10 +125,10 @@ export default function WeekCalendar() {
           <p className="text-sm text-muted-foreground mt-1">See your week at a glance</p>
         </div>
         <button
-          onClick={() => signIn('google')}
+          onClick={() => connect()}
           className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition"
         >
-          Sign in with Google
+          Connect Google Calendar
         </button>
       </div>
     )
@@ -161,8 +161,8 @@ export default function WeekCalendar() {
             </button>
           )}
         </div>
-        {status === 'authenticated' && (
-          <button onClick={() => signOut()} className="text-xs text-muted-foreground hover:text-foreground transition">
+        {connected && (
+          <button onClick={() => disconnect()} className="text-xs text-muted-foreground hover:text-foreground transition">
             Disconnect
           </button>
         )}
