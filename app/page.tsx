@@ -12,6 +12,7 @@ const TodayScheduleWidget = dynamic(() => import('@/components/dashboard/TodaySc
 const PriorityTodosWidget = dynamic(() => import('@/components/dashboard/PriorityTodosWidget'), { ssr: false })
 const GoalsDashboardWidget = dynamic(() => import('@/components/dashboard/GoalsWidget'), { ssr: false })
 const ShoppingDashboardWidget = dynamic(() => import('@/components/dashboard/ShoppingWidget'), { ssr: false })
+const GroceriesDashboardWidget = dynamic(() => import('@/components/dashboard/GroceriesWidget'), { ssr: false })
 
 const GRID_CONFIG = {
   cols: 12,
@@ -29,6 +30,7 @@ const DEFAULT_LAYOUT: LayoutItem[] = [
   { i: 'todos',    x: 8, y: 3, w: 4, h: 6, minW: 3, minH: 3 },
   { i: 'goals',    x: 0, y: 9, w: 6, h: 5, minW: 3, minH: 3 },
   { i: 'shopping', x: 6, y: 9, w: 6, h: 5, minW: 3, minH: 3 },
+  { i: 'groceries', x: 0, y: 14, w: 4, h: 4, minW: 2, minH: 3 },
 ]
 
 
@@ -140,6 +142,11 @@ export default function DashboardPage() {
             <div key="shopping">
               <WidgetShell id="shopping">
                 <ShoppingDashboardWidget />
+              </WidgetShell>
+            </div>
+            <div key="groceries">
+              <WidgetShell id="groceries">
+                <GroceriesDashboardWidget />
               </WidgetShell>
             </div>
           </GridLayout>

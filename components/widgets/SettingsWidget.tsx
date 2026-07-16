@@ -797,6 +797,7 @@ function AdminTab({ me }: { me: Profile }) {
 
 const SHARE_TOOLS: { id: SharedTool; label: string; icon: string }[] = [
   { id: 'shopping', label: 'Shopping Waitlist', icon: '🛒' },
+  { id: 'groceries', label: 'Groceries', icon: '🧺' },
   { id: 'cookbook', label: 'Cookbook', icon: '🍳' },
 ]
 

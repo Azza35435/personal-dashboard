@@ -258,7 +258,38 @@ export interface Profile {
   created_at: string
 }
 
-export type SharedTool = 'shopping' | 'cookbook'
+export type SharedTool = 'shopping' | 'cookbook' | 'groceries'
+
+export type GroceryCategory = 'produce' | 'dairy' | 'meat' | 'bakery' | 'pantry' | 'frozen' | 'household' | 'other'
+
+export interface GroceryItem {
+  id: string
+  user_id: string
+  group_id: string | null
+  name: string
+  qty: string | null
+  note: string | null
+  category: GroceryCategory
+  checked: boolean
+  cleared_at: string | null
+  created_at: string
+}
+
+export interface WishlistItem {
+  id: string
+  user_id: string
+  name: string
+  price: number | null
+  url: string | null
+  priority: Priority
+  saved_amount: number
+  target_date: string | null
+  occasion: string | null
+  purchased: boolean
+  purchased_at: string | null
+  position: number
+  created_at: string
+}
 
 export interface Group {
   id: string
