@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { alertActive, discountPct, meetsRule, STORE_LABEL } from '@/lib/shopping'
+import { firstSharedGroup } from '@/lib/groups'
 import type { ShoppingAlertType, ShoppingItem, ShoppingPrice, ShoppingStore } from '@/lib/types'
 import { formatPrice } from '@/lib/utils'
 
@@ -195,7 +196,9 @@ export default function ShoppingWaitlistWidget() {
   const addItem = async () => {
     if (!addForm.name.trim()) return
     const maxPos = items.reduce((m, i) => Math.max(m, i.position), -1)
-    await supabase.from('shopping_items').insert({ ...formToRow(addForm), position: maxPos + 1 })
+    // stamp the household group (if one shares shopping) so members see it
+    const groupId = await firstSharedGroup('shopping')
+    await supabase.from('shopping_items').insert({ ...formToRow(addForm), position: maxPos + 1, group_id: groupId })
     setAddForm(emptyForm)
     setAdding(false)
     load()

@@ -12,7 +12,7 @@ import {
   type NavEntry,
   type PrefState,
 } from '@/lib/sidebarPrefs'
-import type { Profile } from '@/lib/types'
+import type { Group, Profile, SharedTool } from '@/lib/types'
 
 type Tab = 'sidebar' | 'preferences' | 'account' | 'admin'
 
@@ -787,6 +787,209 @@ function AdminTab({ me }: { me: Profile }) {
           Invited people sign in with their Google account — no password to share.
         </p>
       </div>
+
+      <GroupsCard members={members} />
+    </div>
+  )
+}
+
+/* ─────────────────────── Sharing groups ──────────────────────── */
+
+const SHARE_TOOLS: { id: SharedTool; label: string; icon: string }[] = [
+  { id: 'shopping', label: 'Shopping Waitlist', icon: '🛒' },
+  { id: 'cookbook', label: 'Cookbook', icon: '🍳' },
+]
+
+function GroupsCard({ members }: { members: Profile[] }) {
+  const [groups, setGroups] = useState<Group[]>([])
+  const [memberships, setMemberships] = useState<{ group_id: string; user_id: string }[]>([])
+  const [shares, setShares] = useState<{ group_id: string; tool: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newName, setNewName] = useState('')
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    const [{ data: g }, { data: gm }, { data: gs }] = await Promise.all([
+      supabase.from('groups').select('*').order('created_at'),
+      supabase.from('group_members').select('group_id, user_id'),
+      supabase.from('group_shares').select('group_id, tool'),
+    ])
+    setGroups(g ?? [])
+    setMemberships(gm ?? [])
+    setShares(gs ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const run = async (op: PromiseLike<{ error: { message: string } | null }>) => {
+    const { error: err } = await op
+    if (err) setError(err.message)
+    else setError('')
+    load()
+  }
+
+  const createGroup = () => {
+    const name = newName.trim()
+    if (!name) return
+    setNewName('')
+    run(supabase.from('groups').insert({ name }))
+  }
+
+  const isMember = (gid: string, uid: string) => memberships.some(m => m.group_id === gid && m.user_id === uid)
+  const isShared = (gid: string, tool: SharedTool) => shares.some(s => s.group_id === gid && s.tool === tool)
+
+  const toggleMember = (gid: string, uid: string) =>
+    run(
+      isMember(gid, uid)
+        ? supabase.from('group_members').delete().eq('group_id', gid).eq('user_id', uid)
+        : supabase.from('group_members').insert({ group_id: gid, user_id: uid })
+    )
+
+  const toggleShare = (gid: string, tool: SharedTool) =>
+    run(
+      isShared(gid, tool)
+        ? supabase.from('group_shares').delete().eq('group_id', gid).eq('tool', tool)
+        : supabase.from('group_shares').insert({ group_id: gid, tool })
+    )
+
+  return (
+    <div className={cardCls}>
+      <p className={labelCls}>Sharing groups</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 mb-3">
+        Members of a group share the ticked tools: everyone in the group sees and edits the same items. New items are
+        stamped with the group automatically; existing private items stay private.
+      </p>
+
+      {error && (
+        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded px-2 py-1.5 mb-2">
+          {error}
+        </p>
+      )}
+
+      {loading ? (
+        <div className="h-16 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {groups.map(g => (
+            <div key={g.id} className="rounded border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
+              <div className="flex items-center gap-2">
+                {renaming === g.id ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        run(supabase.from('groups').update({ name: renameValue.trim() || g.name }).eq('id', g.id))
+                        setRenaming(null)
+                      }
+                      if (e.key === 'Escape') setRenaming(null)
+                    }}
+                    onBlur={() => {
+                      run(supabase.from('groups').update({ name: renameValue.trim() || g.name }).eq('id', g.id))
+                      setRenaming(null)
+                    }}
+                    className={`${inputCls} py-0.5 text-sm font-medium`}
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 flex-1">{g.name}</p>
+                )}
+                {renaming !== g.id && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setRenaming(g.id)
+                        setRenameValue(g.name)
+                      }}
+                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      title="Rename group"
+                    >
+                      ✎
+                    </button>
+                    {confirmDelete === g.id ? (
+                      <span className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setConfirmDelete(null)
+                            run(supabase.from('groups').delete().eq('id', g.id))
+                          }}
+                          className="text-xs bg-red-600 text-white rounded px-2 py-0.5"
+                        >
+                          Delete group
+                        </button>
+                        <button onClick={() => setConfirmDelete(null)} className="text-xs text-gray-500">
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelete(g.id)}
+                        className="text-xs text-gray-400 hover:text-red-600"
+                        title="Delete group (items revert to their owners)"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="mt-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Members</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {members.map(m => (
+                    <label key={m.id} className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isMember(g.id, m.id)}
+                        onChange={() => toggleMember(g.id, m.id)}
+                        className="accent-gray-900 dark:accent-white"
+                      />
+                      {m.display_name ?? m.email}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Shared tools</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {SHARE_TOOLS.map(t => (
+                    <label key={t.id} className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isShared(g.id, t.id)}
+                        onChange={() => toggleShare(g.id, t.id)}
+                        className="accent-gray-900 dark:accent-white"
+                      />
+                      {t.icon} {t.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex items-center gap-2">
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createGroup()}
+              placeholder="New group name (e.g. Friends)"
+              className={`${inputCls} flex-1`}
+            />
+            <button onClick={createGroup} className={primaryBtnCls}>
+              Add group
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

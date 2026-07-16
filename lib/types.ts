@@ -221,6 +221,7 @@ export type ShoppingStatus = 'watching' | 'purchased'
 export interface ShoppingItem {
   id: string
   user_id: string
+  group_id: string | null
   name: string
   search_query: string | null
   woolworths_url: string | null
@@ -257,6 +258,15 @@ export interface Profile {
   created_at: string
 }
 
+export type SharedTool = 'shopping' | 'cookbook'
+
+export interface Group {
+  id: string
+  name: string
+  created_by: string | null
+  created_at: string
+}
+
 export interface SidebarPref {
   href: string
   position: number
@@ -268,6 +278,7 @@ export type RecipeCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 
 export interface CookbookRecipe {
   id: string
+  group_id?: string | null
   name: string
   category: RecipeCategory
   tried: boolean

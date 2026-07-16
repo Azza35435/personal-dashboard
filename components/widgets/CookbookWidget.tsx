@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { firstSharedGroup } from '@/lib/groups'
 import type { CookbookRecipe, RecipeCategory } from '@/lib/types'
 
 const CATEGORIES: RecipeCategory[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -53,7 +54,10 @@ export default function CookbookWidget() {
 
   const addRecipe = async () => {
     if (!form.name.trim()) return
+    // stamp the household group (if one shares the cookbook) so members see it
+    const groupId = await firstSharedGroup('cookbook')
     await supabase.from('cookbook_recipes').insert({
+      group_id: groupId,
       name: form.name.trim(),
       category: form.category,
       tried: form.tried,
