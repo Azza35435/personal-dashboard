@@ -19,6 +19,7 @@ export interface PrefState {
 export const NAV_ITEMS: NavEntry[] = [
   { href: '/', label: 'Dashboard', icon: '◈' },
   { href: '/schedule', label: 'Schedule & Tasks', icon: '📅' },
+  { href: '/planner', label: 'Planner', icon: '🗓' },
   { href: '/finance', label: 'Finance', icon: '💰' },
   { href: '/health', label: 'Health', icon: '💪' },
   { href: '/apple-health', label: 'Apple Health', icon: '♥' },

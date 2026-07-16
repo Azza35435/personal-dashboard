@@ -260,6 +260,35 @@ export interface Profile {
 
 export type SharedTool = 'shopping' | 'cookbook' | 'groceries'
 
+export interface PlannerBlock {
+  id: string
+  user_id: string
+  date: string // yyyy-MM-dd
+  start_min: number
+  end_min: number
+  title: string
+  color: string
+  note: string | null
+  done: boolean
+  todo_id: string | null
+  routine_id: string | null
+  hidden: boolean
+  suggested: boolean
+  created_at: string
+}
+
+export interface PlannerRoutine {
+  id: string
+  user_id: string
+  title: string
+  start_min: number
+  duration_min: number
+  days: number[] // 0=Mon … 6=Sun
+  color: string
+  active: boolean
+  created_at: string
+}
+
 export type GroceryCategory = 'produce' | 'dairy' | 'meat' | 'bakery' | 'pantry' | 'frozen' | 'household' | 'other'
 
 export interface GroceryItem {
