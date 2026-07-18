@@ -18,12 +18,12 @@ npx tsc --noEmit  # Type-check without building
 
 No test suite is configured yet.
 
-## ⚠ Pending setup (remind Aaron; remove items once done — last checked 2026-07-17)
+## ⚠ Pending setup (remind Aaron; remove items once done — last checked 2026-07-18)
 
 1. **Local `.env.local` has placeholder Google credentials** — `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are literally `your_google_client_id`/`your_google_client_secret`. The deployed site is fine (Vercel has the real values), but `/api/calendar` token refresh fails in local dev until the real values (from Vercel env vars or Google Cloud Console → Credentials) are pasted in.
 2. **Google OAuth consent screen may still be in Testing mode** — if so, Google expires calendar refresh tokens after 7 days, so the calendar silently disconnects weekly for every user (`invalid_grant` → `google_tokens` row deleted → Connect button reappears). Fix: Google Cloud Console → OAuth consent screen → **Publish app**; accept the "unverified app" warning once (verification not needed for personal use).
 
-All five multi-account phases are otherwise complete and deployed; migrations 001–005 have been run in Supabase.
+Everything else is complete and deployed: multi-account (Phases 1–5), tabbed Shopping (Waitlist/Groceries/Wishlist), and the Planner. Migrations **001–007 have all been run** in Supabase (verified 2026-07-18). Deferred by choice: AI day-planning agent for the Planner, and guided onboarding for newly invited users.
 
 ## Architecture
 
