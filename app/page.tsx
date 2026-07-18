@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import GridLayout, { type Layout, type LayoutItem, useContainerWidth } from 'react-grid-layout'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const HeroWidget = dynamic(() => import('@/components/dashboard/HeroWidget'), { ssr: false })
 const QuoteWidget = dynamic(() => import('@/components/dashboard/QuoteWidget'), { ssr: false })
@@ -50,9 +51,39 @@ function WidgetShell({ id, children, onRemove }: { id: string; children: React.R
   )
 }
 
+// Mobile: plain stacked list — no grid, no dragging, dashboard_layout untouched
+function MobileDashboard() {
+  const widgets: [string, React.ReactNode, string][] = [
+    ['hero', <HeroWidget key="hero" />, 'h-44'],
+    ['schedule', <TodayScheduleWidget key="schedule" />, 'h-80'],
+    ['todos', <PriorityTodosWidget key="todos" />, 'h-80'],
+    ['groceries', <GroceriesDashboardWidget key="groceries" />, 'h-72'],
+    ['habits', <HabitsWidget key="habits" />, 'h-80'],
+    ['goals', <GoalsDashboardWidget key="goals" />, 'h-80'],
+    ['shopping', <ShoppingDashboardWidget key="shopping" />, 'h-72'],
+    ['quote', <QuoteWidget key="quote" />, 'h-40'],
+  ]
+  return (
+    <div className="h-full overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525] p-3 space-y-3">
+      {widgets.map(([id, node, h]) => (
+        <div key={id} className={`w-full ${h}`}>
+          {node}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
+  const isMobile = useIsMobile()
+  if (isMobile) return <MobileDashboard />
+  return <DesktopDashboard />
+}
+
+function DesktopDashboard() {
   // measureBeforeMount: the ref'd container must exist on the very first render
-  // (the hook only attaches its ResizeObserver once) — see conditional below.
+  // (the hook only attaches its ResizeObserver once) — this component only
+  // mounts on desktop, so the ref'd div below always renders immediately.
   const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true })
   const [layout, setLayout] = useState<LayoutItem[]>(DEFAULT_LAYOUT)
   const [layoutLoaded, setLayoutLoaded] = useState(false)

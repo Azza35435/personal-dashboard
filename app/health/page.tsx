@@ -9,14 +9,14 @@ const AppleHealthWidget = dynamic(() => import('@/components/widgets/AppleHealth
 
 export default function HealthPage() {
   return (
-    <div className="flex gap-6 h-screen p-6 overflow-hidden">
-      <div className="flex-1 overflow-auto min-w-0">
+    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full lg:h-screen p-3 sm:p-6 overflow-y-auto lg:overflow-hidden">
+      <div className="lg:flex-1 lg:overflow-auto min-w-0">
         <GymWidget />
       </div>
-      <div className="w-72 flex-shrink-0 overflow-auto">
+      <div className="w-full lg:w-72 flex-shrink-0 lg:overflow-auto">
         <NutritionWidget />
       </div>
-      <div className="w-72 flex-shrink-0 overflow-hidden flex flex-col gap-6">
+      <div className="w-full lg:w-72 flex-shrink-0 lg:overflow-hidden flex flex-col gap-4 lg:gap-6">
         <CookbookWidget />
         <div className="flex-shrink-0">
           <AppleHealthWidget />

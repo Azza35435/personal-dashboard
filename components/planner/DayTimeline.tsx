@@ -20,6 +20,7 @@ interface Props {
   items: DayItem[]
   isToday: boolean
   placeMode: boolean
+  tapFirst?: boolean // mobile: no drags — taps open the editor / place todos
   onOpenEditor: (item: DayItem, anchor: DOMRect) => void
   onCreateByDrag: (startMin: number, endMin: number, anchor: DOMRect) => void
   onMoveResize: (item: DayItem, startMin: number, endMin: number) => void
@@ -42,6 +43,7 @@ export default function DayTimeline({
   items,
   isToday,
   placeMode,
+  tapFirst = false,
   onOpenEditor,
   onCreateByDrag,
   onMoveResize,
@@ -123,6 +125,7 @@ export default function DayTimeline({
       onPlace(min)
       return
     }
+    if (tapFirst) return // mobile: blocks come from "+ Block" / tap-to-place only
     const d: TimelineDrag = { kind: 'create', anchorMin: min, startMin: min, endMin: min, active: false }
     dragRef.current = d
     setDrag(d)
@@ -131,6 +134,11 @@ export default function DayTimeline({
   const startBlockDrag = (item: DayItem, e: React.PointerEvent) => {
     if (e.button !== 0 || item.kind === 'gcal') return
     e.stopPropagation()
+    if (tapFirst) {
+      // mobile: tap opens the editor (times are edited there)
+      onOpenEditor(item, (e.currentTarget as HTMLElement).getBoundingClientRect())
+      return
+    }
     const d: TimelineDrag = {
       kind: 'move',
       item,
@@ -144,7 +152,7 @@ export default function DayTimeline({
   }
 
   const startResizeDrag = (item: DayItem, e: React.PointerEvent) => {
-    if (e.button !== 0 || item.kind === 'gcal') return
+    if (e.button !== 0 || item.kind === 'gcal' || tapFirst) return
     e.stopPropagation()
     const d: TimelineDrag = { kind: 'resize', item, anchorMin: 0, startMin: item.start, endMin: item.end, active: false }
     dragRef.current = d
@@ -182,8 +190,8 @@ export default function DayTimeline({
           ref={canvasRef}
           data-planner-canvas
           onPointerDown={startCanvasDrag}
-          className={`relative flex-1 ${placeMode ? 'cursor-copy' : 'cursor-crosshair'}`}
-          style={{ height: CANVAS_HEIGHT }}
+          className={`relative flex-1 ${placeMode ? 'cursor-copy' : tapFirst ? '' : 'cursor-crosshair'}`}
+          style={{ height: CANVAS_HEIGHT, touchAction: 'pan-y' }}
         >
           {hours.map(m => (
             <div key={m} className="absolute inset-x-0 border-t border-gray-100 dark:border-gray-800" style={{ top: minToY(m) }} />

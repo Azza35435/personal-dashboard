@@ -30,7 +30,7 @@ function ShoppingTabs() {
   )
 
   return (
-    <div className="flex-1 overflow-hidden h-full flex flex-col p-6">
+    <div className="flex-1 overflow-hidden h-full flex flex-col p-3 sm:p-6">
       <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
         {TABS.map(t => (
           <button

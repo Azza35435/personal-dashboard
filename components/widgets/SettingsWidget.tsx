@@ -57,7 +57,7 @@ export default function SettingsWidget() {
   ]
 
   return (
-    <div className="p-6 h-full overflow-auto">
+    <div className="p-3 sm:p-6 h-full overflow-auto">
       <div className="max-w-3xl">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Settings</h1>
         <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Customise your dashboard</p>

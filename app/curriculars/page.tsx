@@ -6,7 +6,7 @@ const CurricularsWidget = dynamic(() => import('@/components/widgets/Curriculars
 
 export default function CurricularsPage() {
   return (
-    <div className="h-full p-6 overflow-hidden">
+    <div className="h-full p-3 sm:p-6 overflow-y-auto md:overflow-hidden">
       <CurricularsWidget />
     </div>
   )

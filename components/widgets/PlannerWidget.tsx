@@ -16,6 +16,7 @@ import {
   timeInputToMin,
   type DayItem,
 } from '@/lib/planner'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { PlannerBlock, PlannerRoutine, Todo } from '@/lib/types'
 
 const ROLLOVER_KEY = 'planner_rollover_dismissed'
@@ -44,7 +45,10 @@ function weekDays(anchor: Date): Date[] {
 }
 
 export default function PlannerWidget() {
-  const [view, setView] = useState<'day' | 'week'>('day')
+  const isMobile = useIsMobile()
+  const [viewState, setViewState] = useState<'day' | 'week'>('day')
+  const view = isMobile ? 'day' : viewState // phones are Day-only
+  const setView = setViewState
   const [current, setCurrent] = useState<Date>(new Date())
   const [blocks, setBlocks] = useState<PlannerBlock[]>([])
   const [routines, setRoutines] = useState<PlannerRoutine[]>([])
@@ -370,11 +374,11 @@ export default function PlannerWidget() {
     'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded placeholder-gray-400 px-2 py-1.5 text-sm outline-none'
 
   return (
-    <div className="flex-1 overflow-hidden h-full flex flex-col p-6 text-gray-900 dark:text-gray-100">
+    <div className="flex-1 overflow-hidden h-full flex flex-col p-3 sm:p-6 pb-14 md:pb-6 text-gray-900 dark:text-gray-100">
       {/* header */}
       <div className="flex flex-wrap items-center gap-2 mb-4 flex-shrink-0">
         <h1 className="text-xl font-semibold mr-2">Planner</h1>
-        <div className="flex rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="hidden md:flex rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
           {(['day', 'week'] as const).map(v => (
             <button
               key={v}
@@ -464,6 +468,7 @@ export default function PlannerWidget() {
           <DayTimeline
             items={itemsByDate.get(currentDateStr) ?? []}
             isToday={isViewingToday}
+            tapFirst={isMobile}
             placeMode={!!pickedTodo}
             onOpenEditor={openEditorFor}
             onCreateByDrag={createByDrag}
@@ -497,14 +502,16 @@ export default function PlannerWidget() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setEditor(null)} />
           <div
-            className="fixed z-50 w-80 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-4 flex flex-col gap-2.5"
+            className="fixed z-50 w-80 max-w-[calc(100vw-24px)] rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-4 flex flex-col gap-2.5"
             style={
-              editor.anchor
-                ? {
-                    left: Math.min(editor.anchor.x, window.innerWidth - 340),
-                    top: Math.min(editor.anchor.y + 6, window.innerHeight - 340),
-                  }
-                : { left: '50%', top: '30%', transform: 'translateX(-50%)' }
+              isMobile
+                ? { left: '50%', bottom: 16, transform: 'translateX(-50%)' }
+                : editor.anchor
+                  ? {
+                      left: Math.min(editor.anchor.x, window.innerWidth - 340),
+                      top: Math.min(editor.anchor.y + 6, window.innerHeight - 340),
+                    }
+                  : { left: '50%', top: '30%', transform: 'translateX(-50%)' }
             }
           >
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">

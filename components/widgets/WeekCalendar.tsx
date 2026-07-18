@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useCalendarConnection } from '@/lib/useCalendarConnection'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { CalendarEvent } from '@/lib/types'
 
 const START_HOUR = 7
@@ -47,10 +48,12 @@ function getEventPos(event: CalendarEvent, weekDays: Date[], hourHeight: number)
 
 export default function WeekCalendar() {
   const { connected, status, connect, disconnect } = useCalendarConnection()
+  const isMobile = useIsMobile()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [calError, setCalError] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
+  const [dayOffset, setDayOffset] = useState(0) // mobile: days from today
   const gridRef = useRef<HTMLDivElement>(null)
   const timeRef = useRef<HTMLDivElement>(null)
   const [hourHeight, setHourHeight] = useState(48)
@@ -63,12 +66,26 @@ export default function WeekCalendar() {
     return getWeekDays(base)
   })()
 
+  // Phones show a single day at a time; desktop keeps the full week
+  const visibleDays = isMobile
+    ? [
+        (() => {
+          const d = new Date(today)
+          d.setDate(today.getDate() + dayOffset)
+          d.setHours(0, 0, 0, 0)
+          return d
+        })(),
+      ]
+    : weekDays
+
+  const isCurrentPeriod = isMobile ? dayOffset === 0 : weekOffset === 0
+
   const fetchEvents = () => {
     if (!connected) return
     setLoading(true)
     setCalError(null)
-    const start = weekDays[0].toISOString()
-    const end = new Date(weekDays[6].getTime() + 86400000).toISOString()
+    const start = visibleDays[0].toISOString()
+    const end = new Date(visibleDays[visibleDays.length - 1].getTime() + 86400000).toISOString()
     fetch(`/api/calendar?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)
       .then(r => r.json())
       .then(data => {
@@ -86,15 +103,15 @@ export default function WeekCalendar() {
   useEffect(() => {
     fetchEvents()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, weekOffset])
+  }, [connected, weekOffset, dayOffset, isMobile])
 
-  // Auto-refresh every 5 minutes when viewing the current week
+  // Auto-refresh every 5 minutes when viewing the current week/day
   useEffect(() => {
-    if (!connected || weekOffset !== 0) return
+    if (!connected || !isCurrentPeriod) return
     const interval = setInterval(fetchEvents, 5 * 60 * 1000)
     return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, weekOffset])
+  }, [connected, weekOffset, dayOffset, isMobile])
 
   // Measure grid container and compute hourHeight so the grid fills without scrolling
   useEffect(() => {
@@ -110,11 +127,12 @@ export default function WeekCalendar() {
 
   const now = new Date()
   const currentTimeTop = (now.getHours() + now.getMinutes() / 60 - START_HOUR) * hourHeight
-  const isCurrentWeek = weekOffset === 0
 
-  const monthLabel = weekDays[0].getMonth() === weekDays[6].getMonth()
-    ? weekDays[0].toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
-    : `${weekDays[0].toLocaleDateString('en-AU', { month: 'short' })} – ${weekDays[6].toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}`
+  const monthLabel = isMobile
+    ? visibleDays[0].toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
+    : weekDays[0].getMonth() === weekDays[6].getMonth()
+      ? weekDays[0].toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
+      : `${weekDays[0].toLocaleDateString('en-AU', { month: 'short' })} – ${weekDays[6].toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}`
 
   if (status === 'disconnected') {
     return (
@@ -140,21 +158,21 @@ export default function WeekCalendar() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setWeekOffset(w => w - 1)}
+            onClick={() => (isMobile ? setDayOffset(d => d - 1) : setWeekOffset(w => w - 1))}
             className="p-1.5 rounded-md hover:bg-muted transition text-muted-foreground text-sm"
           >
             ‹
           </button>
           <span className="text-sm font-semibold min-w-[160px] text-center">{monthLabel}</span>
           <button
-            onClick={() => setWeekOffset(w => w + 1)}
+            onClick={() => (isMobile ? setDayOffset(d => d + 1) : setWeekOffset(w => w + 1))}
             className="p-1.5 rounded-md hover:bg-muted transition text-muted-foreground text-sm"
           >
             ›
           </button>
-          {weekOffset !== 0 && (
+          {!isCurrentPeriod && (
             <button
-              onClick={() => setWeekOffset(0)}
+              onClick={() => (isMobile ? setDayOffset(0) : setWeekOffset(0))}
               className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80 transition text-muted-foreground ml-1"
             >
               Today
@@ -171,11 +189,13 @@ export default function WeekCalendar() {
       {/* Day header row */}
       <div className="flex flex-shrink-0 border-b border-border">
         <div className="w-12 flex-shrink-0" />
-        {weekDays.map((day, i) => {
+        {visibleDays.map((day, i) => {
           const isToday = day.toDateString() === today.toDateString()
           return (
             <div key={i} className="flex-1 py-2.5 text-center">
-              <p className="text-xs text-muted-foreground uppercase font-medium tracking-wide">{DAYS[i]}</p>
+              <p className="text-xs text-muted-foreground uppercase font-medium tracking-wide">
+                {DAYS[(day.getDay() + 6) % 7]}
+              </p>
               <div className={`text-sm font-semibold mt-1 w-8 h-8 flex items-center justify-center rounded-full mx-auto
                 ${isToday ? 'bg-primary text-primary-foreground' : ''}`}>
                 {day.getDate()}
@@ -214,10 +234,10 @@ export default function WeekCalendar() {
             </div>
 
             {/* Day columns */}
-            {weekDays.map((day, dayIndex) => {
+            {visibleDays.map((day, dayIndex) => {
               const isToday = day.toDateString() === today.toDateString()
               const dayEvents = events
-                .map(e => ({ event: e, pos: getEventPos(e, weekDays, hourHeight) }))
+                .map(e => ({ event: e, pos: getEventPos(e, visibleDays, hourHeight) }))
                 .filter(({ pos }) => pos?.dayIndex === dayIndex)
 
               return (
@@ -235,7 +255,7 @@ export default function WeekCalendar() {
                   ))}
 
                   {/* Current time indicator */}
-                  {isToday && isCurrentWeek && currentTimeTop > 0 && currentTimeTop < TOTAL_HOURS * hourHeight && (
+                  {isToday && currentTimeTop > 0 && currentTimeTop < TOTAL_HOURS * hourHeight && (
                     <div
                       ref={timeRef}
                       className="absolute inset-x-0 z-10 pointer-events-none"

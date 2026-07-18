@@ -334,7 +334,7 @@ export default function FinanceLock({ children }: { children: ReactNode }) {
     <>
       {settingsOverlay}
       <div
-        className="p-6 h-full overflow-auto"
+        className="p-3 sm:p-6 h-full overflow-auto"
         onClick={() => showMenu && setShowMenu(false)}
       >
         <div className="flex items-center justify-between mb-6">

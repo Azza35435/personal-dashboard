@@ -44,6 +44,8 @@ Everything else is complete and deployed: multi-account (Phases 1–5), tabbed S
 
 **Sidebar nav** (`components/Sidebar.tsx`, NAV_ITEMS in `lib/sidebarPrefs.ts`): Dashboard, Schedule & Tasks, Planner, Finance, Health, Apple Health, Habits, Goals, Shopping Waitlist, Notes, Curriculars, Deadlines. The Shopping Waitlist entry shows a green count badge of active sale alerts (fetched on every route change via `alertActive()` from `lib/shopping.ts`). Nav items are **drag-to-reorder** (pointer-event pattern, 6px movement threshold so plain clicks still navigate; `didDragRef` suppresses the Link click after a drag). Dashboard is pinned at index 0 and not draggable; drops are clamped to index ≥ 1. Per-user prefs persist to the `sidebar_prefs` table (PK `(user_id, href)`: position, `hidden`, `custom_label`); unknown/new NAV_ITEMS not in the table are appended in default order. The sidebar renders `custom_label ?? label` and filters out hidden items (drag operates on the visible list; hidden items keep their relative order at the end). Sidebar returns `null` on `/login`.
 
+**Responsive sidebar (2026-07)**: on mobile (<`md`) the aside is hidden — a fixed `h-12` top bar (☰ with a green dot when sale alerts exist, title, date; `<main>` has `pt-12 md:pt-0` in `app/layout.tsx`) opens a slide-in overlay drawer (`w-64`, scrim, closes on nav/scrim/Escape; **no drag-reorder in the drawer** — tap-first, Settings arrows cover it). On desktop a `«`/`»` footer button collapses the sidebar to a `w-14` icon-only rail (tooltips via `title`, badge becomes a corner dot), persisted in localStorage `sidebar_collapsed` (deliberately device-level, not in `sidebar_prefs`).
+
 **Settings page** (`app/settings/page.tsx` → `components/widgets/SettingsWidget.tsx`): ⚙ Settings link pinned at the sidebar footer (not part of the reorderable list). Tabbed page — **Sidebar** (per tool: ⠿ drag-reorder *and* ↑/↓ arrows, ✎ inline rename shown as `custom (default)`, 👁/🚫 hide toggle; Dashboard row pinned with no controls; hidden pages stay reachable by URL; "Reset to defaults" deletes the user's `sidebar_prefs` rows), **Preferences** (nutrition targets — same `nutrition_targets` localStorage key the Nutrition/Gym widgets read; Finance PIN set/change/remove — same `finance_passcode_hash` localStorage sha256-hex scheme as FinanceLock), **Account** (profile + Sign out → `supabase.auth.signOut()`; Google Calendar connect/disconnect via NextAuth `useSession` until Phase 4), **Admin** (only when `profiles.is_admin`: member list from `profiles`, pending invites = `allowed_users` rows without a profile, invite by email inserts into `allowed_users` client-side, remove calls `DELETE /api/admin/members` — admin-checked route using `supabaseAdmin` that deletes the allowlist row and the auth user, cascading away their data; plus a **Sharing groups** card — create/rename/delete groups, member checkboxes, per-tool share toggles, all direct client-side writes under the admin RLS policies).
 
 **Sidebar↔settings sync** (`lib/sidebarPrefs.ts`): shared module owning `NAV_ITEMS`, `loadSidebarPrefs()`/`persistSidebarPrefs()`/`resetSidebarPrefs()` and a `sidebar-prefs-changed` window event — both Sidebar and the settings page persist through it and re-load on the event, so edits on `/settings` appear in the sidebar instantly (and sidebar drags update the settings page).
@@ -231,6 +233,7 @@ Full-page day/week time-blocking planner at `/planner` (sidebar entry 🗓 Plann
 - **Roll-over banner**: on today's Day view, yesterday's `done=false, hidden=false, routine_id null` blocks offer "Reschedule to today" (copies at same times) or Dismiss (localStorage `planner_rollover_dismissed` = date).
 - **Google Calendar overlay**: fetches the existing `/api/calendar` for the visible range; timed events render as read-only gray 🔒 blocks (all-day skipped, cross-midnight clamped); `notConnected` shows a hint bar linking to Settings. No write-back — scope stays `calendar.readonly`.
 - **Agent-ready**: `planner_blocks.suggested BOOL` exists (unused in v1) and all mutations live in PlannerWidget, so a future `/api/planner/suggest` route can insert AI-drafted blocks rendered as accept/reject drafts.
+- **Mobile**: Day view only (Day|Week toggle hidden <`md`); DayTimeline gets `tapFirst` — no create/move/resize drags (canvas `touch-action: pan-y`; block tap opens the editor, times edited there); the todo tray renders as a fixed bottom sheet ("📋 To-dos (N)" bar → expandable list, tap todo → place-mode; desktop right panel is `hidden md:flex` in the same component); editor popover bottom-centred with `max-w-[calc(100vw-24px)]`. Widget root has `pb-14 md:pb-6` clearing the sheet bar.
 
 #### GroceriesWidget (`components/widgets/GroceriesWidget.tsx`)
 
@@ -249,6 +252,7 @@ Full-page day/week time-blocking planner at `/planner` (sidebar entry 🗓 Plann
 
 #### WeekCalendar (`components/widgets/WeekCalendar.tsx`)
 
+- **Mobile day mode**: `useIsMobile()` → `visibleDays` collapses to a single day with its own `dayOffset` nav (‹/›/Today step one day; header shows the full day name); desktop keeps the 7-day week on `weekOffset`. All grid maths runs off `visibleDays`, so both modes share the render path.
 - Shows events from **all Google Calendars** (not just primary) by first fetching `calendarList` then parallel-fetching events per calendar in `/api/calendar`.
 - Auto-refreshes events every 5 minutes when viewing the current week.
 - `fetchEvents` is an extracted named function so it can be called by both the `useEffect` on session/weekOffset change and the auto-refresh interval.
@@ -270,7 +274,9 @@ Seven lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
 
 Each widget is a self-contained card with `rounded-2xl shadow` styling, `overflow-hidden`, and `flex flex-col` for header + scrollable body.
 
-The bento grid in `app/page.tsx`:
+**Mobile dashboard**: `app/page.tsx` splits into `<MobileDashboard>` (a plain full-width stacked list — fixed order, fixed heights, no grid, never touches `dashboard_layout`) and `<DesktopDashboard>` (everything below), switched by `useIsMobile()`. The split keeps `useContainerWidth`'s mount-once ResizeObserver away from a branch where its ref'd div wouldn't render.
+
+The bento grid in `app/page.tsx` (desktop only):
 - Uses `react-grid-layout` v2 (`GridLayout` default export). In v2, `cols`/`rowHeight`/`margin` go in `gridConfig`, `draggableHandle` goes in `dragConfig.handle`, `resizeHandles` goes in `resizeConfig.handles`.
 - Layout persisted to `dashboard_layout` Supabase table (debounced 800ms on `onLayoutChange`).
 - Container width measured via `useContainerWidth({ measureBeforeMount: true })` exported from `react-grid-layout`; the `mounted` flag gates grid rendering until the first real measurement. **The ref'd container div must render on the component's very first render** — the hook attaches its ResizeObserver in a mount-once effect, so an early return (e.g. a loading state) that omits the ref'd div leaves the width frozen at the hook's 1280px default forever (grid too narrow on wide screens, overflowing on narrow ones). The loading spinner therefore renders *inside* the ref'd container, never instead of it. Do NOT use a manual `ResizeObserver` + `useState(1200)` either — same class of bug.
@@ -296,6 +302,7 @@ Calendar API error messages include the HTTP status and Google's response body (
 ### Shared utilities
 
 - `lib/types.ts` — all TypeScript interfaces and union types including: `Account`, `Todo`, `Habit`, `Section`, `Curricular`, `CurricularDeadline`, `Subscription`, `IncomeStream`, `AppleHealthLog`, etc. Union types: `AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`, `BillingCycle`, `SubscriptionCategory`.
+- `lib/useIsMobile.ts` — `useIsMobile()`: behavioural <`md` matchMedia hook (starts `false` for hydration safety, flips in an effect). Use for interaction/structure switches; pure layout uses Tailwind `md:` classes. Page containers use `p-3 sm:p-6`; multi-column pages stack with `flex-col lg:flex-row` (see `app/health/page.tsx`, `app/schedule/page.tsx`).
 - `lib/utils.ts` — `cn()` (clsx + tailwind-merge), `formatCurrency()` (AUD, `en-AU`, rounds to whole dollars — finance widgets), `formatPrice()` (AUD with cents — shopping prices), `formatDate()`, `formatTime()`, `isToday()`, `isPast()`
 - `types/next-auth.d.ts` — module augmentation to add `accessToken?: string` to the `Session` type
 

@@ -6,7 +6,7 @@ const NutritionWidget = dynamic(() => import('@/components/widgets/NutritionWidg
 
 export default function NutritionPage() {
   return (
-    <div className="p-6 h-full overflow-auto">
+    <div className="p-3 sm:p-6 h-full overflow-auto">
       <h1 className="text-xl font-semibold mb-6">Nutrition</h1>
       <div className="max-w-xl">
         <NutritionWidget />

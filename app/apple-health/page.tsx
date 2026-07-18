@@ -6,7 +6,7 @@ const AppleHealthTracker = dynamic(() => import('@/components/widgets/AppleHealt
 
 export default function AppleHealthPage() {
   return (
-    <div className="p-6 h-full overflow-auto">
+    <div className="p-3 sm:p-6 h-full overflow-auto">
       <AppleHealthTracker />
     </div>
   )
