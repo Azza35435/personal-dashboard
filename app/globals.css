@@ -173,3 +173,43 @@
     @apply font-sans;
   }
 }
+
+/* Dashboard editorial theme (2026-08) — scoped to app/page.tsx only, see
+   CLAUDE.md "Dashboard page exception". Fonts are loaded locally via
+   next/font/google in app/page.tsx and applied as a class alongside this one. */
+.dashboard-editorial {
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+  --paper: oklch(97.5% 0.012 80);
+  --paper-raised: oklch(99% 0.006 80);
+  --ink: oklch(22% 0.02 55);
+  --ink-soft: oklch(46% 0.018 55);
+  --ink-faint: oklch(64% 0.014 55);
+  --rule: oklch(22% 0.02 55 / 13%);
+  --rule-strong: oklch(22% 0.02 55 / 30%);
+  --oxblood: oklch(45% 0.1 25);
+  --sage: oklch(45% 0.1 150);
+}
+.dark .dashboard-editorial {
+  --paper: oklch(18% 0.014 55);
+  --paper-raised: oklch(22% 0.014 55);
+  --ink: oklch(93% 0.008 80);
+  --ink-soft: oklch(74% 0.012 80);
+  --ink-faint: oklch(54% 0.012 80);
+  --rule: oklch(93% 0.008 80 / 12%);
+  --rule-strong: oklch(93% 0.008 80 / 26%);
+  --oxblood: oklch(66% 0.11 25);
+  --sage: oklch(66% 0.11 150);
+}
+
+.dashboard-editorial .eyebrow {
+  font: 600 11px/1 var(--font-public-sans), system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.dashboard-editorial .hairline {
+  border-color: var(--rule);
+}
+.dashboard-editorial .num {
+  font-variant-numeric: tabular-nums;
+}

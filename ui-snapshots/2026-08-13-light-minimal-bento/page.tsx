@@ -3,22 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import GridLayout, { type Layout, type LayoutItem, useContainerWidth } from 'react-grid-layout'
 import dynamic from 'next/dynamic'
-import { Newsreader, Public_Sans } from 'next/font/google'
 import { supabase } from '@/lib/supabase'
 import { useIsMobile } from '@/lib/useIsMobile'
-
-const newsreader = Newsreader({
-  variable: '--font-newsreader',
-  subsets: ['latin'],
-  style: ['normal', 'italic'],
-  weight: ['400', '500'],
-})
-const publicSans = Public_Sans({
-  variable: '--font-public-sans',
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-})
-const editorialFonts = `dashboard-editorial ${newsreader.variable} ${publicSans.variable}`
 
 const HeroWidget = dynamic(() => import('@/components/dashboard/HeroWidget'), { ssr: false })
 const QuoteWidget = dynamic(() => import('@/components/dashboard/QuoteWidget'), { ssr: false })
@@ -56,7 +42,7 @@ function WidgetShell({ id, children, onRemove }: { id: string; children: React.R
       <div className="drag-handle absolute inset-x-0 top-0 h-6 z-10 cursor-grab active:cursor-grabbing rounded-t-2xl" />
       {/* Resize indicator (bottom-right corner, shown on hover) */}
       <div className="absolute bottom-1.5 right-1.5 z-10 w-3 h-3 pointer-events-none opacity-0 group-hover/shell:opacity-30 transition">
-        <svg viewBox="0 0 12 12" className="fill-current" style={{ color: 'var(--ink-faint)' }}>
+        <svg viewBox="0 0 12 12" className="text-gray-400 dark:text-gray-500 fill-current">
           <path d="M12 8L8 12H12V8ZM12 4L4 12H6L12 6V4ZM12 0L0 12H2L12 2V0Z" />
         </svg>
       </div>
@@ -78,7 +64,7 @@ function MobileDashboard() {
     ['quote', <QuoteWidget key="quote" />, 'h-40'],
   ]
   return (
-    <div className={`${editorialFonts} h-full overflow-y-auto p-3 space-y-3`} style={{ background: 'var(--paper)' }}>
+    <div className="h-full overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525] p-3 space-y-3">
       {widgets.map(([id, node, h]) => (
         <div key={id} className={`w-full ${h}`}>
           {node}
@@ -136,29 +122,13 @@ function DesktopDashboard() {
     }, 800)
   }, [])
 
-  const now = new Date()
-
   return (
-    <div ref={containerRef} className={`${editorialFonts} h-full overflow-y-auto`} style={{ background: 'var(--paper)' }}>
-      <div
-        className="flex items-baseline justify-between px-8 py-5 hairline border-b"
-        style={{ color: 'var(--ink)' }}
-      >
-        <div style={{ fontFamily: 'var(--font-newsreader)', fontSize: 20, letterSpacing: '0.01em' }}>
-          Aaron<em style={{ fontStyle: 'italic', color: 'var(--oxblood)' }}>&nbsp;/ Dashboard</em>
-        </div>
-        <div className="text-right">
-          <div className="eyebrow">{now.toLocaleDateString('en-AU', { weekday: 'long' })}</div>
-          <div className="text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
-            {now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })} — Melbourne
-          </div>
-        </div>
-      </div>
+    <div ref={containerRef} className="h-full overflow-y-auto bg-gradient-to-br from-[#faf9f7] to-[#f0edf8] dark:from-gray-950 dark:to-[#1a1525]">
       {!layoutLoaded || !mounted ? (
         <div className="h-full flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--oxblood)', borderTopColor: 'transparent' }} />
-            <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>Loading dashboard…</p>
+            <div className="w-8 h-8 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+            <p className="text-sm text-gray-400">Loading dashboard…</p>
           </div>
         </div>
       ) : (

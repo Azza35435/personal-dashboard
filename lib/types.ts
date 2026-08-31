@@ -45,12 +45,15 @@ export interface HabitGroup {
   created_at: string
 }
 
+export type HabitPeriod = 'morning' | 'afternoon' | 'evening' | 'anytime'
+
 export interface Habit {
   id: string
   name: string
   active: boolean
   position: number
   group_id: string | null
+  period: HabitPeriod
   created_at: string
 }
 
@@ -212,6 +215,14 @@ export interface AppleHealthLog {
   stand_hours: number | null
   weight_kg: number | null
   updated_at: string
+}
+
+export interface AppleHealthCheckin {
+  id: string
+  date: string
+  mood: number | null // 1-5
+  note: string | null
+  created_at: string
 }
 
 export type ShoppingStore = 'woolworths' | 'coles' | 'chemist'

@@ -3,7 +3,16 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import type { Habit, HabitGroup } from '@/lib/types'
+import type { Habit, HabitGroup, HabitPeriod } from '@/lib/types'
+import { PERIOD_INFO } from '@/lib/habits'
+
+const PERIOD_OPTIONS: { value: HabitPeriod; label: string }[] = [
+  { value: 'anytime', label: 'Anytime' },
+  { value: 'morning', label: PERIOD_INFO.morning.label },
+  { value: 'afternoon', label: PERIOD_INFO.afternoon.label },
+  { value: 'evening', label: PERIOD_INFO.evening.label },
+]
+const PERIOD_TAG: Record<HabitPeriod, string> = { anytime: '', morning: 'AM', afternoon: 'PM', evening: 'Eve' }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CELL_W = 30
@@ -114,6 +123,8 @@ export default function HabitTracker() {
   const [delConfirm, setDelConfirm]     = useState<DeleteConfirm | null>(null)
   const [addingIn, setAddingIn]         = useState<string | null>(null) // gAttr value
   const [newHabitName, setNewHabitName] = useState('')
+  const [newHabitPeriod, setNewHabitPeriod] = useState<HabitPeriod>('anytime')
+  const [popHabitPeriod, setPopHabitPeriod] = useState<HabitPeriod>('anytime')
   const [addingGrp, setAddingGrp]       = useState(false)
   const [newGrpName, setNewGrpName]     = useState('')
   const popRef = useRef<HTMLDivElement>(null)
@@ -282,8 +293,8 @@ export default function HabitTracker() {
     if (!name) return
     const inGrp = habits.filter(h => h.group_id === groupId)
     const maxPos = inGrp.length ? Math.max(...inGrp.map(h => h.position)) : -1
-    await supabase.from('habits').insert({ name, active: true, position: maxPos + 1, group_id: groupId })
-    setAddingIn(null); setNewHabitName(''); load()
+    await supabase.from('habits').insert({ name, active: true, position: maxPos + 1, group_id: groupId, period: newHabitPeriod })
+    setAddingIn(null); setNewHabitName(''); setNewHabitPeriod('anytime'); load()
   }
 
   const deleteHabit = async (id: string) => {
@@ -310,6 +321,12 @@ export default function HabitTracker() {
     if (!name.trim()) return
     await supabase.from('habits').update({ name: name.trim() }).eq('id', id)
     setPopover(null); load()
+  }
+
+  const updateHabitPeriod = async (id: string, period: HabitPeriod) => {
+    setPopHabitPeriod(period)
+    await supabase.from('habits').update({ period }).eq('id', id)
+    load()
   }
 
   const renameGroup = async (id: string, name: string) => {
@@ -524,6 +541,13 @@ export default function HabitTracker() {
                       onChange={e => setNewHabitName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') addHabit(sec.id); if (e.key === 'Escape') { setAddingIn(null); setNewHabitName('') } }}
                     />
+                    <select
+                      value={newHabitPeriod}
+                      onChange={e => setNewHabitPeriod(e.target.value as HabitPeriod)}
+                      className="text-xs bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1 py-1 text-gray-600 dark:text-gray-300 outline-none focus:border-violet-400"
+                    >
+                      {PERIOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                     <button onClick={() => addHabit(sec.id)} className="text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-2 py-1 rounded">Add</button>
                   </div>
                 )}
@@ -547,11 +571,14 @@ export default function HabitTracker() {
                         className="text-gray-300 dark:text-gray-600 cursor-grab text-sm select-none px-0.5 touch-none"
                       >⠿</span>
                       <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 min-w-0">{h.name}</span>
+                      {PERIOD_TAG[h.period] && (
+                        <span className="text-[9px] text-gray-400 dark:text-gray-600 flex-shrink-0">{PERIOD_TAG[h.period]}</span>
+                      )}
                       <button
                         onClick={e => {
                           const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                           setPopover({ type: 'habit', id: h.id, top: r.bottom + 4, left: r.left - 120 })
-                          setPopHabitName(h.name); setDelConfirm(null)
+                          setPopHabitName(h.name); setPopHabitPeriod(h.period); setDelConfirm(null)
                         }}
                         className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-[11px] transition"
                       >···</button>
@@ -821,6 +848,16 @@ export default function HabitTracker() {
                 >
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   <option value={GEN}>General (ungrouped)</option>
+                </select>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Dashboard period</p>
+                <select
+                  className="w-full text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 text-gray-700 dark:text-gray-300 outline-none focus:border-violet-400"
+                  value={popHabitPeriod}
+                  onChange={e => updateHabitPeriod(popHabit.id, e.target.value as HabitPeriod)}
+                >
+                  {PERIOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div className="border-t border-gray-100 dark:border-gray-800 pt-2">

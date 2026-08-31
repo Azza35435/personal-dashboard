@@ -48,16 +48,15 @@ export default function QuoteWidget() {
   const quote = QUOTES[getDayOfYear(new Date()) % QUOTES.length]
 
   return (
-    <div
-      className="h-full flex flex-col justify-center px-7 border hairline overflow-hidden"
-      style={{ background: 'var(--paper-raised)', borderColor: 'var(--rule)', borderLeft: '2px solid var(--ink)' }}
-    >
-      <p
-        style={{ fontFamily: 'var(--font-newsreader)', fontStyle: 'italic', fontWeight: 400, fontSize: 17, lineHeight: 1.45, color: 'var(--ink)' }}
-      >
-        &ldquo;{quote.text}&rdquo;
-      </p>
-      <p className="text-xs uppercase tracking-widest mt-3" style={{ color: 'var(--ink-faint)' }}>— {quote.author}</p>
+    <div className="h-full flex flex-col justify-between p-6 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 rounded-2xl overflow-hidden">
+      <span className="text-5xl leading-none text-amber-300 dark:text-amber-500 font-serif select-none">"</span>
+      <div>
+        <p className="text-sm font-medium text-gray-800 dark:text-gray-100 leading-relaxed italic">
+          {quote.text}
+        </p>
+        <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 font-medium">— {quote.author}</p>
+      </div>
+      <p className="text-[10px] text-amber-400/60 dark:text-amber-600/60 uppercase tracking-widest self-end">Daily quote</p>
     </div>
   )
 }

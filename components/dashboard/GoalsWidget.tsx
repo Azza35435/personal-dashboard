@@ -67,69 +67,82 @@ export default function GoalsDashboardWidget() {
   const monthLabel = d.toLocaleDateString('en-AU', { month: 'long' })
 
   return (
-    <div className="rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] bg-white dark:bg-gray-900 flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between flex-shrink-0">
+    <div className="h-full flex flex-col border hairline overflow-hidden" style={{ background: 'var(--paper-raised)', borderColor: 'var(--rule)' }}>
+      <div className="px-6 pt-6 pb-3 flex-shrink-0 flex items-baseline justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Monthly Goals</p>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{monthLabel}</p>
+          <p className="eyebrow">Goals — {monthLabel}</p>
         </div>
         {totalGoals > 0 && (
           <div className="text-right">
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{overallPct}<span className="text-sm font-normal text-gray-400">%</span></p>
-            <p className="text-[10px] text-gray-400">{completedGoals}/{totalGoals} done</p>
+            <p
+              className="num"
+              style={{ fontFamily: 'var(--font-newsreader)', fontSize: 22, color: 'var(--oxblood)' }}
+            >
+              {overallPct}%
+            </p>
+            <p className="text-[10px]" style={{ color: 'var(--ink-faint)' }}>{completedGoals}/{totalGoals} done</p>
           </div>
         )}
       </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+      <div className="flex-1 overflow-y-auto px-6 pb-5">
         {loading ? (
           <div className="space-y-2">
-            {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-8 bg-gray-100 dark:bg-gray-800 rounded" />)}
+            {[1, 2, 3].map(i => <div key={i} className="animate-pulse h-6 rounded" style={{ background: 'var(--rule)' }} />)}
           </div>
         ) : goals.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center py-4">
-            <p className="text-xs text-gray-400 dark:text-gray-500">No monthly goals set yet</p>
-            <Link href="/goals" className="text-xs text-violet-500 hover:text-violet-600 font-medium">
+            <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>No monthly goals set yet</p>
+            <Link href="/goals" className="text-xs font-medium" style={{ color: 'var(--oxblood)' }}>
               Set goals →
             </Link>
           </div>
         ) : (
-          goals.map(goal => {
-            const ms = milestones[goal.id] ?? []
-            const done = ms.filter(m => m.completed).length
-            const total = ms.length
-            const pct = total > 0 ? Math.round((done / total) * 100) : null
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+            {goals.map(goal => {
+              const ms = milestones[goal.id] ?? []
+              const done = ms.filter(m => m.completed).length
+              const total = ms.length
+              const pct = total > 0 ? Math.round((done / total) * 100) : null
 
-            return (
-              <div key={goal.id} className={`rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2 ${goal.completed ? 'opacity-50' : ''}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`text-xs font-medium flex-1 min-w-0 truncate ${goal.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                    {goal.title}
-                  </span>
-                  {total > 0 && (
-                    <span className="text-[10px] text-gray-400 flex-shrink-0 tabular-nums">{done}/{total}</span>
+              return (
+                <div key={goal.id} className={goal.completed ? 'opacity-50' : ''}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span
+                      className="text-sm flex-1 min-w-0 truncate"
+                      style={goal.completed
+                        ? { color: 'var(--ink-faint)', textDecoration: 'line-through' }
+                        : { color: 'var(--ink)' }}
+                    >
+                      {goal.title}
+                    </span>
+                    {total > 0 && (
+                      <span
+                        className="num flex-shrink-0"
+                        style={{ fontFamily: 'var(--font-newsreader)', fontSize: 14, color: 'var(--oxblood)' }}
+                      >
+                        {pct}%
+                      </span>
+                    )}
+                  </div>
+                  {pct !== null && (
+                    <div className="mt-2 h-[2px] relative" style={{ background: 'var(--rule-strong)' }}>
+                      <div
+                        className="absolute inset-y-0 left-0"
+                        style={{ width: `${pct}%`, background: 'var(--sage)' }}
+                      />
+                    </div>
                   )}
                 </div>
-                {pct !== null && (
-                  <div className="mt-1.5 h-1 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-emerald-400' : 'bg-violet-400'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          })
+              )
+            })}
+          </div>
         )}
       </div>
 
-      {/* Footer link */}
       {goals.length > 0 && (
-        <div className="px-4 pb-3 flex-shrink-0 border-t border-gray-50 dark:border-gray-800 pt-2">
-          <Link href="/goals" className="text-[11px] text-violet-500 hover:text-violet-600 font-medium">
+        <div className="px-6 pb-4 flex-shrink-0 pt-2" style={{ borderTop: '1px solid var(--rule)' }}>
+          <Link href="/goals" className="text-[11px] font-medium" style={{ color: 'var(--ink-faint)' }}>
             Full tracker →
           </Link>
         </div>

@@ -7,6 +7,9 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
+import { computeHealthScore } from '@/lib/healthScore'
+import ScoreRing from '@/components/health/ScoreRing'
+import CheckIn from '@/components/health/CheckIn'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -304,6 +307,14 @@ export default function AppleHealthTracker() {
   return (
     <div className="space-y-6 max-w-5xl">
       <h1 className="text-xl font-semibold">Apple Health</h1>
+
+      {/* ── Today: score ring + check-in streak ─────────────────────── */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded shadow-sm px-5 py-4 flex items-center gap-6">
+        <ScoreRing score={computeHealthScore(logByDate[todayStr()])} size={96} label="Today's score" />
+        <div className="flex-1">
+          <CheckIn variant="full" />
+        </div>
+      </div>
 
       {/* ── Snapshot ─────────────────────────────────────────────────── */}
       <div>

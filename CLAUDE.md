@@ -18,18 +18,20 @@ npx tsc --noEmit  # Type-check without building
 
 No test suite is configured yet.
 
-## ⚠ Pending setup (remind Aaron; remove items once done — last checked 2026-07-18)
+## ⚠ Pending setup (remind Aaron; remove items once done — last checked 2026-08-31)
 
 1. **Local `.env.local` has placeholder Google credentials** — `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are literally `your_google_client_id`/`your_google_client_secret`. The deployed site is fine (Vercel has the real values), but `/api/calendar` token refresh fails in local dev until the real values (from Vercel env vars or Google Cloud Console → Credentials) are pasted in.
 2. **Google OAuth consent screen may still be in Testing mode** — if so, Google expires calendar refresh tokens after 7 days, so the calendar silently disconnects weekly for every user (`invalid_grant` → `google_tokens` row deleted → Connect button reappears). Fix: Google Cloud Console → OAuth consent screen → **Publish app**; accept the "unverified app" warning once (verification not needed for personal use).
+3. **Migration `008-habit-periods.sql` needs to be run** (adds `habits.period`, default `'anytime'` — safe/additive, existing habits keep showing everywhere until re-tagged).
+4. **Migration `009-health-checkins.sql` needs to be run** (new `apple_health_checkins` table powering the Bevel-style check-in streak on the Apple Health page/widget — see the AppleHealthTracker section).
 
-Everything else is complete and deployed: multi-account (Phases 1–5), tabbed Shopping (Waitlist/Groceries/Wishlist), and the Planner. Migrations **001–007 have all been run** in Supabase (verified 2026-07-18). Deferred by choice: AI day-planning agent for the Planner, and guided onboarding for newly invited users.
+Everything else is complete and deployed: multi-account (Phases 1–5), tabbed Shopping (Waitlist/Groceries/Wishlist), the Planner, and the **editorial dashboard reskin** (2026-08-13 — see Styling section). Migrations **001–007 have all been run** in Supabase (verified 2026-07-18); 008–009 are the outstanding items above. Deferred by choice: AI day-planning agent for the Planner, and guided onboarding for newly invited users.
 
 ## Architecture
 
 **Main entry points:**
 
-- **`app/page.tsx`** — Home dashboard: bento-grid layout using `react-grid-layout` v2.2.3. Seven widgets (Hero, Quote, Today's Schedule, Habits, Priority Todos, Goals, Shopping) arranged in a drag-resizable grid. Layout persisted to Supabase `dashboard_layout` table. Widget components live in `components/dashboard/`.
+- **`app/page.tsx`** — Home dashboard: bento-grid layout using `react-grid-layout` v2.2.3. Eight widgets (Hero, Quote, Today's Schedule, Habits, Priority Todos, Goals, Shopping, Groceries) arranged in a drag-resizable grid, drag/resize + `dashboard_layout` persistence unchanged by the 2026-08-13 editorial reskin (styling-only — see Styling section). Widget components live in `components/dashboard/`. Old ("light minimal bento") styling saved in `ui-snapshots/2026-08-13-light-minimal-bento/` — see its README to revert if the new look doesn't stick.
 - **`app/schedule/page.tsx`** — Schedule & Tasks: the original home layout with `WeekCalendar` + `TodoWidget` sidebar.
 - **`app/planner/page.tsx`** — Planner (PlannerWidget): private day/week time-blocking with Google Calendar overlay, todo scheduling and recurring routines. See the PlannerWidget section.
 - **`app/finance/page.tsx`** — Finance: NetWorthWidget + AccountsWidget + IncomeWidget in a 3-column grid, wrapped in `FinanceLock`. Below the grid (full-width `col-span-full`): `SubscriptionsWidget`.
@@ -62,7 +64,7 @@ The app is multi-account: invite-only Google sign-in via **Supabase Auth**, per-
 - **`app/login/page.tsx`**: Google sign-in button (`signInWithOAuth` → `/auth/callback` PKCE exchange in `app/auth/callback/route.ts`). Shows a friendly "not invited" state — Supabase surfaces the allowlist trigger's rejection as `Database error saving new user`.
 - **Invite gate**: `allowed_users` table (email PK, `is_admin` flag) + an `AFTER INSERT` trigger on `auth.users` that raises unless the email is allowlisted, and auto-creates the `profiles` row (id = auth uid, email, display_name, avatar_url, is_admin copied from the invite).
 - **RLS**: every data table has `user_id UUID NOT NULL DEFAULT auth.uid()` and an `"Own rows"` policy (`user_id = auth.uid()`), so widget inserts need no code changes. Service-role inserts **must stamp `user_id` explicitly** (the default evaluates to NULL without a session) — see the shopping check route and health-sync route.
-- **Migrations** live in `migrations/` and must be run in order in the Supabase SQL editor: `001-auth-foundation.sql` (profiles/allowlist — run, then sign in once), `002-per-user-data.sql` (user_id + RLS on all tables, backfills to the owner by email lookup), `003-sidebar-prefs.sql` (per-user sidebar prefs, drops `sidebar_order`), `004-google-tokens.sql` (per-user Google Calendar tokens), `005-sharing-groups.sql` (groups/members/shares + group RLS + "Family" seed), `006-groceries-wishlist.sql` (grocery_items shared via `'groceries'` tool, private wishlist_items, groceries auto-shared for groups sharing shopping), `007-planner.sql` (planner_blocks + planner_routines, private).
+- **Migrations** live in `migrations/` and must be run in order in the Supabase SQL editor: `001-auth-foundation.sql` (profiles/allowlist — run, then sign in once), `002-per-user-data.sql` (user_id + RLS on all tables, backfills to the owner by email lookup), `003-sidebar-prefs.sql` (per-user sidebar prefs, drops `sidebar_order`), `004-google-tokens.sql` (per-user Google Calendar tokens), `005-sharing-groups.sql` (groups/members/shares + group RLS + "Family" seed), `006-groceries-wishlist.sql` (grocery_items shared via `'groceries'` tool, private wishlist_items, groceries auto-shared for groups sharing shopping), `007-planner.sql` (planner_blocks + planner_routines, private), `008-habit-periods.sql` (habits.period), `009-health-checkins.sql` (apple_health_checkins, private — Bevel-style check-in streak).
 - **Table quirks after 002**: `notes` is one row per user (PK `user_id`, the old `id=1` column is gone); `dashboard_layout` PK is `(user_id, widget_id)`; `apple_health_logs` unique key is `(user_id, date)` — health-sync stamps the admin profile's id since the iOS shortcut authenticates with a shared secret.
 - **NextAuth is fully retired** (Phase 4, 2026-07): one Google consent at sign-in covers both login and calendar. Nothing imports `next-auth`; there is no SessionProvider.
 - **Sharing groups** (Phase 5): admin-managed `groups` + `group_members` + `group_shares` (`tool` ∈ `'shopping' | 'cookbook' | 'groceries'`, extensible). Shareable tables (`shopping_items`, `cookbook_recipes`) have a nullable `group_id`; their RLS is "Own or group rows" — `user_id = auth.uid() OR group_id IN (SELECT my_shared_groups(tool))`. `shopping_prices` visibility piggybacks on `shopping_items` (`item_id IN (SELECT id FROM shopping_items)` — the items policy runs inside the subquery). SECURITY DEFINER helpers `is_admin()`, `my_groups()`, `my_shared_groups(tool)` avoid recursive RLS; `my_shared_groups` is also called from the client via `supabase.rpc` (`lib/groups.ts` → `firstSharedGroup(tool)`) so ShoppingWaitlistWidget/CookbookWidget stamp new rows with the first group sharing that tool (null = private). Deleting a group `SET NULL`s `group_id` — items revert to their owners. Existing private rows are NOT retroactively shared when a share is enabled (only rows already stamped with the group).
@@ -122,6 +124,13 @@ Each widget in `components/widgets/` is self-contained: it owns its loading stat
 - **Tried toggle**: circular checkbox on each card flips `tried` in Supabase without opening the card.
 - **`load` as `useCallback`**: no dependencies; called once on mount and after every mutation.
 
+#### AppleHealthTracker / AppleHealthWidget (`components/widgets/AppleHealthTracker.tsx`, `components/widgets/AppleHealthWidget.tsx`)
+
+Full page at `/apple-health` (AppleHealthTracker) + a compact card on the Health page (AppleHealthWidget, rose accent). Both read the iOS-Shortcut-synced `apple_health_logs` table (see the setup guide in AppleHealthTracker for the sync mechanism) and share two Bevel-style additions (2026-08) layered on top via `lib/healthScore.ts` + `components/health/`:
+
+- **Score ring** (`components/health/ScoreRing.tsx`): a composite 0–100 "day score" SVG donut (same ring markup as HabitTracker's `DonutRing`). `computeHealthScore()` averages `min(value/target, 1)` across whichever of steps / exercise_min / active_energy_kcal / stand_hours / sleep_total_min actually have data that day (returns `null`, rendered as a gray "—" ring, if none do). Targets default in `DEFAULT_HEALTH_SCORE_TARGETS` and persist to `localStorage['health_score_targets']` (same freeform pattern as `nutrition_targets` — no UI to edit them yet). Color: emerald ≥80, amber ≥50, rose below (`scoreColor()`). The full-page ring scopes to *today's* log specifically (`logByDate[todayStr()]`, gray until today syncs); the compact widget ring uses whatever the latest synced row is (matching the widget's existing "latest, not necessarily today" convention).
+- **Check-in streak** (`components/health/CheckIn.tsx`, table `apple_health_checkins` — migration `009-health-checkins.sql`, own-rows RLS): a manual daily ritual independent of the Apple Health sync — tap "Check in", optionally pick a 1–5 mood emoji + note, upserted on `(user_id, date)`. 🔥 streak = consecutive check-in dates walking back from today (`currentStreak()` in `lib/healthScore.ts`; today's check-in isn't required yet to keep yesterday's streak alive before you've checked in this morning). `longestStreak()` shown once it exceeds the current streak. `variant="compact"` (widget: flame + pill button/badge) vs `variant="full"` (full page: same plus "Best streak" line and an inline mood/note form instead of a popover). Renders even with zero Apple Health data synced, so the streak can start independently of the iOS Shortcut setup.
+
 #### HabitTracker (`components/widgets/HabitTracker.tsx`)
 
 Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (installed v3) for line charts.
@@ -140,11 +149,13 @@ Full-page Excel-style monthly habit tracker at `/habits`. Uses **Recharts** (ins
 - **Habit drag** (`habitDrag`/`habitDragRef`): `data-hdrop-gid` + `data-hdrop-idx` on every habit row in all 3 columns. Supports cross-group drops — removes from source group, inserts at dest at `overIndex`, persists `position` + `group_id`.
 - **Group drag** (`groupDrag`/`groupDragRef`): `⠿` on group header rows in Col 1. `data-gdrop-idx` on headers. Reorders named groups only; persists `position` to `habit_groups`.
 
-**Popovers**: `···` on habit rows → rename input + group picker (immediate reassign) + delete. `···` on group headers → rename input + delete. Delete group with habits → move-or-delete confirmation (`DeleteConfirm` state) with destination picker + "Also delete all habits" checkbox.
+**Popovers**: `···` on habit rows → rename input + group picker (immediate reassign) + **dashboard period picker** (Anytime/Morning/Afternoon/Evening, see below) + delete. `···` on group headers → rename input + delete. Delete group with habits → move-or-delete confirmation (`DeleteConfirm` state) with destination picker + "Also delete all habits" checkbox.
 
 **Data**: `habit_groups` (ordered by position) + `habits` (active, ordered by position then created_at) + `habit_completions` for the viewed month. Completions keyed as `${habit_id}:${day}`. Multi-month trend loaded separately on mount. `load` depends on `[startDate, endDate]`.
 
-**Home dashboard widget** (`components/dashboard/HabitsWidget.tsx`): Today's checkboxes + small monthly % donut + "Full tracker →" link to `/habits`.
+**Habit periods** (`habits.period`, migration 008, helpers in `lib/habits.ts`): each habit can be tagged `morning` / `afternoon` / `evening` / `anytime` (default) via the add-habit form or the `···` popover's "Dashboard period" select — shown here only as a small text tag (`AM`/`PM`/`Eve`, blank for `anytime`) next to the habit name. **This page intentionally does not filter by period** — it's a whole-month historical view across all habits regardless of tag; only the dashboard `HabitsWidget` filters.
+
+**Home dashboard widget** (`components/dashboard/HabitsWidget.tsx`): rotating period view — three tabs (Morning 5am–12pm / Afternoon 12pm–9pm / Evening 9pm–5am), defaulting to whichever period `lib/habits.ts`'s `getCurrentPeriod()` says is active "now" (tappable to preview another period). Shows only habits visible in the selected period (`habitVisibleInPeriod()` — a habit with `period = 'anytime'` shows in all three), today's checkboxes for that set, and a %-donut scoped to the same set ("this period", not the whole month). "Full tracker →" links to `/habits`.
 
 #### CurricularsWidget (`components/widgets/CurricularsWidget.tsx`)
 
@@ -261,18 +272,18 @@ Full-page day/week time-blocking planner at `/planner` (sidebar entry 🗓 Plann
 
 ### Dashboard widgets (`components/dashboard/`)
 
-Seven lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
+Eight lightweight widgets for the home bento-grid dashboard (`app/page.tsx`):
 
-- **`HeroWidget`**: Live ticking clock (1s interval), greeting by hour (Good morning/afternoon/evening/night), Melbourne location. Violet gradient background.
-- **`QuoteWidget`**: 36 curated quotes, one per day (`getDayOfYear % 36`). Amber gradient. No external API.
-- **`HabitsWidget`**: Today's habit checkboxes + monthly % donut ring (computed from month-to-date completions). Links to `/habits` full tracker.
-- **`TodayScheduleWidget`**: Fetches `/api/calendar` for today's date range. Shows unauthenticated state with "Connect Calendar" button. Uses `useSession` from next-auth.
+- **`HeroWidget`**: Live ticking clock (1s interval), greeting by hour (Good morning/afternoon/evening/night), Melbourne location.
+- **`QuoteWidget`**: 36 curated quotes, one per day (`getDayOfYear % 36`). No external API.
+- **`HabitsWidget`**: rotating Morning/Afternoon/Evening period tabs + today's checkboxes + %-donut scoped to the selected period. See "Habit periods" under HabitTracker above.
+- **`TodayScheduleWidget`**: Fetches `/api/calendar` for today's date range. Shows unauthenticated state with "Connect Calendar" button. Uses `useCalendarConnection()` (`lib/useCalendarConnection.ts`).
 - **`PriorityTodosWidget`**: Todos where `priority = 'high'` OR `due_date = today`, not completed. Toggle-complete removes from list. Shows due-date badge.
 - **`GoalsWidget`** (`components/dashboard/GoalsWidget.tsx`): Monthly goals summary — current month + carried-over incomplete goals, each with a milestone progress bar. Links to `/goals` full tracker.
 - **`ShoppingWidget`** (`components/dashboard/ShoppingWidget.tsx`): "On Sale Now" — watching items with `on_sale_now = true`, each showing store, latest price and `-N%`. Links to `/shopping`.
 - **`GroceriesWidget`** (`components/dashboard/GroceriesWidget.tsx`): unchecked grocery count + first 6 items with qty badges. Links to `/shopping?tab=groceries`.
 
-Each widget is a self-contained card with `rounded-2xl shadow` styling, `overflow-hidden`, and `flex flex-col` for header + scrollable body.
+Each widget is a self-contained flat hairline-bordered card (`.dashboard-editorial` theme — see Styling), `overflow-hidden`, `flex flex-col` for header + scrollable body.
 
 **Mobile dashboard**: `app/page.tsx` splits into `<MobileDashboard>` (a plain full-width stacked list — fixed order, fixed heights, no grid, never touches `dashboard_layout`) and `<DesktopDashboard>` (everything below), switched by `useIsMobile()`. The split keeps `useContainerWidth`'s mount-once ResizeObserver away from a branch where its ref'd div wouldn't render.
 
@@ -304,6 +315,7 @@ Calendar API error messages include the HTTP status and Google's response body (
 - `lib/types.ts` — all TypeScript interfaces and union types including: `Account`, `Todo`, `Habit`, `Section`, `Curricular`, `CurricularDeadline`, `Subscription`, `IncomeStream`, `AppleHealthLog`, etc. Union types: `AccountType`, `AccountGroup`, `IncomeCategory`, `Priority`, `BillingCycle`, `SubscriptionCategory`.
 - `lib/useIsMobile.ts` — `useIsMobile()`: behavioural <`md` matchMedia hook (starts `false` for hydration safety, flips in an effect). Use for interaction/structure switches; pure layout uses Tailwind `md:` classes. Page containers use `p-3 sm:p-6`; multi-column pages stack with `flex-col lg:flex-row` (see `app/health/page.tsx`, `app/schedule/page.tsx`).
 - `lib/utils.ts` — `cn()` (clsx + tailwind-merge), `formatCurrency()` (AUD, `en-AU`, rounds to whole dollars — finance widgets), `formatPrice()` (AUD with cents — shopping prices), `formatDate()`, `formatTime()`, `isToday()`, `isPast()`
+- `lib/habits.ts` — `getCurrentPeriod()`, `PERIOD_INFO`, `ROTATING_PERIODS`, `habitVisibleInPeriod()` — shared by the dashboard `HabitsWidget` (filters + tab labels) and `HabitTracker` (period tag + picker options)
 - `types/next-auth.d.ts` — module augmentation to add `accessToken?: string` to the `Session` type
 
 ### Styling
@@ -318,17 +330,19 @@ Tailwind v4 (CSS-first config via `@import "tailwindcss"` in `globals.css`).
 - Section labels: `text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500`
 - Color use: **semantic only** — red = danger/over-budget, green = done, yellow = warning. No decorative color.
 - Left border accent (2px) per widget area identifies each widget type. Accents: emerald=NetWorth, teal=Accounts, amber=Income/Cookbook, blue=Gym/Nutrition, violet=Habits/Curriculars, slate=Notes, rose=Todo.
-- **Dashboard page exception**: `app/page.tsx` uses its own soft gradient background (`from-[#faf9f7] to-[#f0edf8]` light / `from-gray-950 to-[#1a1525]` dark) instead of the `BackgroundTheme` body background. Dashboard widget cards use `rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)]` for a softer Dribbble-inspired look.
+- **Dashboard page exception**: `app/page.tsx` (and its `components/dashboard/` widgets) opt out of this system entirely into the **"editorial" theme** (2026-08-13) — see below. It does not use the `BackgroundTheme` body background either.
 
-**Background**: `BackgroundTheme.tsx` shifts the body background from near-black at night to near-white during the day (Melbourne sunrise/sunset). It also adds/removes the `dark` class on `<html>`, so all `dark:` Tailwind variants respond automatically. (The `/` dashboard overrides this with its own gradient.)
+**Editorial dashboard theme** (`.dashboard-editorial` class, applied to both `MobileDashboard` and `DesktopDashboard` root divs in `app/page.tsx`; tokens + `.eyebrow`/`.hairline`/`.num` utilities defined in `app/globals.css` after the base `:root`/`.dark` blocks): Newsreader (serif, italic accents — greetings, quotes, times, percentages) + Public Sans (everything else) loaded locally via `next/font/google` in `app/page.tsx` (not the root layout — no other route pays for the font load). Warm paper background (`--paper`/`--paper-raised`), ink/rule OKLCH scale, two semantic accents at matching chroma/lightness: `--oxblood` (emphasis, high-priority, on-sale, percentages) and `--sage` (done/progress). Full light + dark values in `globals.css`; dark variant selected automatically via `.dark .dashboard-editorial` (same `dark` class `BackgroundTheme.tsx` toggles on `<html>`). Widget cards are flat hairline-bordered rectangles (`border hairline`, `background: var(--paper-raised)`) with rows separated by `border-top: 1px solid var(--rule)` instead of the old rounded/shadowed pill-per-row style. Desktop gets a masthead bar (wordmark + day/date) above the grid; mobile skips it since the `pt-12` top bar in `app/layout.tsx` already shows title/date there.
 
-**UI history**: Previous designs are saved in `ui-snapshots/`. The original colorful bubble design is at `ui-snapshots/2026-06-22-colorful-bubbles/` with a README explaining how to restore it.
+**Background**: `BackgroundTheme.tsx` shifts the body background from near-black at night to near-white during the day (Melbourne sunrise/sunset). It also adds/removes the `dark` class on `<html>`, so all `dark:` Tailwind variants — and the editorial theme's `.dark .dashboard-editorial` tokens — respond automatically. (The `/` dashboard overrides the body background with its own `--paper` flat color.)
+
+**UI history**: Previous designs are saved in `ui-snapshots/`. The original colorful bubble design is at `ui-snapshots/2026-06-22-colorful-bubbles/`; the light-minimal bento dashboard (pre-editorial-reskin) is at `ui-snapshots/2026-08-13-light-minimal-bento/` — both have READMEs explaining how to restore them.
 
 ### Database schema
 
-Forty Supabase tables: `profiles`, `allowed_users`, `google_tokens`, `groups`, `group_members`, `group_shares`, `grocery_items`, `wishlist_items`, `planner_blocks`, `planner_routines`, `accounts`, `income_streams`, `todos`, `notes` (one row per user, PK `user_id`, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `cookbook_recipes`, `apple_health_logs`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `sidebar_prefs`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Base (single-user) schema SQL is in `supabase-schema.sql`; the multi-account layer (user_id columns, per-user RLS, profiles/allowlist/sidebar_prefs) is applied by `migrations/001..003` — see the Auth section. All data tables have per-user `"Own rows"` RLS policies.
+Forty-one Supabase tables: `profiles`, `allowed_users`, `google_tokens`, `groups`, `group_members`, `group_shares`, `grocery_items`, `wishlist_items`, `planner_blocks`, `planner_routines`, `accounts`, `income_streams`, `todos`, `notes` (one row per user, PK `user_id`, upserted), `habits`, `habit_completions`, `habit_groups`, `sections`, `todo_sections`, `nutrition_logs`, `gym_sessions`, `gym_exercises`, `gym_templates`, `gym_template_exercises`, `cookbook_recipes`, `apple_health_logs`, `apple_health_checkins`, `curriculars`, `curricular_metrics`, `curricular_notes`, `curricular_links`, `curricular_deadlines`, `subscriptions`, `dashboard_layout`, `sidebar_prefs`, `goal_categories`, `goals`, `goal_milestones`, `goal_decisions`, `shopping_items`, `shopping_prices`. Base (single-user) schema SQL is in `supabase-schema.sql`; the multi-account layer (user_id columns, per-user RLS, profiles/allowlist/sidebar_prefs) is applied by `migrations/001..003` — see the Auth section. All data tables have per-user `"Own rows"` RLS policies.
 
-**`habits`** has `position INTEGER NOT NULL DEFAULT 0` and `group_id UUID` columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
+**`habits`** has `position INTEGER NOT NULL DEFAULT 0`, `group_id UUID`, and `period TEXT NOT NULL DEFAULT 'anytime'` (`migrations/008-habit-periods.sql` — morning/afternoon/evening/anytime, see HabitTracker section) columns. **`habit_groups`** table stores named groups. Run these migrations if not already applied:
 ```sql
 ALTER TABLE habits ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE habits ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES habit_groups(id) ON DELETE SET NULL;

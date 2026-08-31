@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useCalendarConnection } from '@/lib/useCalendarConnection'
 import type { CalendarEvent } from '@/lib/types'
 
+const EVENT_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899']
+
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
@@ -38,22 +40,21 @@ export default function TodayScheduleWidget() {
   }, [connected])
 
   return (
-    <div className="h-full flex flex-col border hairline overflow-hidden" style={{ background: 'var(--paper-raised)', borderColor: 'var(--rule)' }}>
-      <div className="px-6 pt-6 pb-3 flex-shrink-0">
-        <p className="eyebrow">Today&rsquo;s Schedule</p>
-        <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-faint)' }}>
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="px-5 pt-5 pb-3 flex-shrink-0">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Today's Schedule</p>
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
           {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-5">
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
         {status === 'disconnected' && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>Connect Google Calendar to see today&rsquo;s events</p>
+            <p className="text-xs text-gray-400">Connect Google Calendar to see today's events</p>
             <button
               onClick={() => connect()}
-              className="text-xs px-3 py-1.5 rounded font-medium transition"
-              style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+              className="text-xs px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-medium transition"
             >
               Connect Calendar
             </button>
@@ -62,40 +63,32 @@ export default function TodayScheduleWidget() {
         {connected && loading && (
           <div className="space-y-2.5 pt-1">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-10 rounded animate-pulse" style={{ background: 'var(--rule)' }} />
+              <div key={i} className="h-12 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
             ))}
           </div>
         )}
         {connected && !loading && error && (
-          <p className="text-xs pt-2" style={{ color: 'var(--oxblood)' }}>{error}</p>
+          <p className="text-xs text-red-400 pt-2">{error}</p>
         )}
         {connected && !loading && !error && events.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>No events today</p>
+            <p className="text-xs text-gray-400">No events today</p>
           </div>
         )}
         {connected && !loading && !error && events.length > 0 && (
-          <div>
+          <div className="space-y-2 pt-1">
             {events.map((event, idx) => {
+              const color = EVENT_COLORS[idx % EVENT_COLORS.length]
               const start = event.start.dateTime ? fmtTime(event.start.dateTime) : 'All day'
               const end = event.end?.dateTime ? fmtTime(event.end.dateTime) : ''
               return (
-                <div
-                  key={event.id}
-                  className="grid gap-3 py-2.5"
-                  style={{ gridTemplateColumns: '68px 1fr', borderTop: idx === 0 ? 'none' : '1px solid var(--rule)' }}
-                >
-                  <p
-                    className="num whitespace-nowrap text-[13px]"
-                    style={{ fontFamily: 'var(--font-newsreader)', fontStyle: 'italic', color: 'var(--ink-soft)' }}
-                  >
-                    {start}
-                  </p>
-                  <div className="min-w-0">
-                    <p className="text-sm truncate" style={{ color: 'var(--ink)' }}>{event.summary}</p>
-                    {end && (
-                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-faint)' }}>until {end}</p>
-                    )}
+                <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                  <div className="w-1 self-stretch rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: color }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{event.summary}</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      {start}{end ? ` – ${end}` : ''}
+                    </p>
                   </div>
                 </div>
               )

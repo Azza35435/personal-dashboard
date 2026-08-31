@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { AppleHealthLog } from '@/lib/types'
+import { computeHealthScore } from '@/lib/healthScore'
+import ScoreRing from '@/components/health/ScoreRing'
+import CheckIn from '@/components/health/CheckIn'
 
 function fmtMins(min: number | null) {
   if (min == null) return '—'
@@ -73,20 +76,29 @@ export default function AppleHealthWidget() {
             ))}
           </div>
         ) : !log ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2 py-6 text-center">
-            <span className="text-3xl">♡</span>
-            <p className="text-sm text-gray-500">No data yet</p>
-            <p className="text-xs text-gray-400">Set up your iOS Shortcut to start syncing</p>
-            <Link
-              href="/apple-health"
-              className="mt-2 text-xs px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded"
-            >
-              Setup guide →
-            </Link>
+          <div className="flex flex-col gap-4 h-full">
+            <CheckIn variant="compact" />
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 py-4 text-center">
+              <span className="text-3xl">♡</span>
+              <p className="text-sm text-gray-500">No data yet</p>
+              <p className="text-xs text-gray-400">Set up your iOS Shortcut to start syncing</p>
+              <Link
+                href="/apple-health"
+                className="mt-2 text-xs px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded"
+              >
+                Setup guide →
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <p className="text-xs text-gray-400">{fmtDate(log.date)}</p>
+            <div className="flex items-center gap-4">
+              <ScoreRing score={computeHealthScore(log)} size={64} />
+              <div className="flex-1 flex flex-col gap-2">
+                <p className="text-xs text-gray-400">{fmtDate(log.date)}</p>
+                <CheckIn variant="compact" />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <Stat icon="🌙" label="Sleep" value={fmtMins(log.sleep_total_min)} />
               <Stat icon="❤️" label="Resting HR" value={log.resting_hr?.toFixed(0) ?? '—'} unit="bpm" />
